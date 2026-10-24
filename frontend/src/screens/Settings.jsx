@@ -141,17 +141,6 @@ export default function Settings({ onNavigate }) {
         <Row label="Confirm numbers first" detail="Results with digits wait for a tap">
           <Toggle on={settings.confirmNumbers} onChange={(confirmNumbers) => update({ confirmNumbers })} />
         </Row>
-        <Row label="Smoothing" detail="Off speaks the raw lip-reading, uncorrected">
-          <Segmented
-            options={[
-              { value: "off", label: "Off" },
-              { value: "light", label: "Light" },
-              { value: "full", label: "Full" },
-            ]}
-            value={settings.smoothing}
-            onChange={(smoothing) => update({ smoothing })}
-          />
-        </Row>
       </Card>
 
       <Card

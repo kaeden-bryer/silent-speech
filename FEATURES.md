@@ -15,7 +15,7 @@ Priorities follow the brief: **Must** = demo fails without it · **Should** = ma
 | Stock voice fallback | Should | Mentioned in Setup copy | A default TTS voice when no clone exists (Kokoro already does this once wired) |
 | Phrase bank (one tap, never misread) | Should | Static chips in Setup + Settings | Store per-user phrases; speak them without the lip-reading path |
 | Live partial transcript while mouthing | Nice | "Reading…" overlay exists | Streaming recognition (current API is per-clip); CLAUDE.md's WebSocket design is the natural fit |
-| Settings that do something | Should | Placeholders: auto-speak, smoothing level, opening line, hold-on filler, live captions, text size | Per-setting support: smoothing = how aggressive `correct()` is; opening line / filler = canned audio into calls |
+| Call settings that do something | Should | Persisted toggles: live captions, opening line, hold-on filler | Opening line / filler = canned audio into calls; captions = transcription of the other side |
 
 ## Parked in the frontend (built, hidden from nav)
 

@@ -63,16 +63,6 @@ export default function LiveCapture({ onNavigate }) {
     setRecording(true);
   }
 
-  // What actually gets spoken, honoring the smoothing setting:
-  // "off" speaks the raw lip-reading; the backend audio is for the corrected
-  // text, so raw falls back to the browser voice.
-  function spoken(r) {
-    const { smoothing } = getSettings();
-    return smoothing === "off" && r.raw_text
-      ? { ...r, text: r.raw_text, audio: null }
-      : r;
-  }
-
   async function send(request) {
     setBusy(true);
     setError(null);
@@ -80,11 +70,10 @@ export default function LiveCapture({ onNavigate }) {
       const r = await request;
       setResult(r);
       const s = getSettings();
-      const toSpeak = spoken(r);
-      if (!toSpeak.text) {
+      if (!r.text) {
         setError("Didn't catch that — mouth one short sentence, or type it.");
-      } else if (s.autoSpeak && !(s.confirmNumbers && /\d/.test(toSpeak.text))) {
-        play(toSpeak);
+      } else if (s.autoSpeak && !(s.confirmNumbers && /\d/.test(r.text))) {
+        play(r);
       }
     } catch (err) {
       setError(`Backend error: ${err.message}`);
@@ -253,11 +242,11 @@ export default function LiveCapture({ onNavigate }) {
               disabled={!result?.text}
               onClick={() => {
                 unlockSound();
-                play(spoken(result));
+                play(result);
               }}
               className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-md shadow-accent/30 transition hover:bg-accent-strong disabled:opacity-40 disabled:shadow-none"
             >
-              {result?.text ? `Speak it — "${spoken(result).text}"` : "Speak it"}
+              {result?.text ? `Speak it — "${result.text}"` : "Speak it"}
             </button>
 
             {typing ? (
@@ -317,7 +306,7 @@ export default function LiveCapture({ onNavigate }) {
               disabled={!result?.text}
               onClick={() => {
                 unlockSound();
-                play(spoken(result));
+                play(result);
               }}
               className="grid size-14 place-items-center rounded-full border border-line text-muted transition hover:text-body disabled:opacity-40 dark:border-line-dark dark:hover:text-white"
             >

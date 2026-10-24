@@ -10,7 +10,6 @@ const DEFAULTS = {
   textScale: 1, // multiplies the root font size (0.85–1.3)
   autoSpeak: true, // speak as soon as a confident result arrives
   confirmNumbers: true, // results containing digits wait for a tap
-  smoothing: "light", // "off" = speak the raw lip-reading | "light" | "full"
   captions: true,
   openingLine: true,
   filler: false,
