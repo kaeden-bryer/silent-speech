@@ -40,13 +40,14 @@
   --color-muted: #767085; /* secondary text (lighter in dark mode, see below) */
 }
 
-/* Everything is rem-based, so scaling the root scales the whole UI */
+/* Everything is rem-based, so scaling the root scales the whole UI.
+   --text-scale is the user's text-size setting (see src/settings.js). */
 html {
-  font-size: 17px;
+  font-size: calc(17px * var(--text-scale, 1));
 }
 @media (min-width: 1024px) {
   html {
-    font-size: 19px;
+    font-size: calc(19px * var(--text-scale, 1));
   }
 }
 

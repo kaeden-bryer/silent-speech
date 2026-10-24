@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, play, unlockSound } from "../api.js";
+import { getSettings, useSettings } from "../settings.js";
 import { EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
 
 // The app's home screen, wired to the backend: mouth a sentence on camera
@@ -14,6 +15,7 @@ const CHANNELS = [
 ];
 
 export default function LiveCapture({ onNavigate }) {
+  const [settings] = useSettings();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
@@ -61,14 +63,29 @@ export default function LiveCapture({ onNavigate }) {
     setRecording(true);
   }
 
+  // What actually gets spoken, honoring the smoothing setting:
+  // "off" speaks the raw lip-reading; the backend audio is for the corrected
+  // text, so raw falls back to the browser voice.
+  function spoken(r) {
+    const { smoothing } = getSettings();
+    return smoothing === "off" && r.raw_text
+      ? { ...r, text: r.raw_text, audio: null }
+      : r;
+  }
+
   async function send(request) {
     setBusy(true);
     setError(null);
     try {
       const r = await request;
       setResult(r);
-      if (r.text) play(r);
-      else setError("Didn't catch that — mouth one short sentence, or type it.");
+      const s = getSettings();
+      const toSpeak = spoken(r);
+      if (!toSpeak.text) {
+        setError("Didn't catch that — mouth one short sentence, or type it.");
+      } else if (s.autoSpeak && !(s.confirmNumbers && /\d/.test(toSpeak.text))) {
+        play(toSpeak);
+      }
     } catch (err) {
       setError(`Backend error: ${err.message}`);
     } finally {
@@ -192,11 +209,18 @@ export default function LiveCapture({ onNavigate }) {
         {/* Result + confirm */}
         <div className="flex flex-col gap-3 md:w-[26rem] md:shrink-0">
           <div className="rounded-2xl border border-line bg-card p-4 dark:border-line-dark dark:bg-panel">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold tracking-widest text-muted uppercase">
                 Did you say…
               </span>
-              {result?.emotion && result.emotion !== "neutral" && <EmotionChip emotion={result.emotion} />}
+              <span className="flex items-center gap-1.5">
+                {result?.emotion && result.emotion !== "neutral" && <EmotionChip emotion={result.emotion} />}
+                {result?.text && settings.confirmNumbers && /\d/.test(result.text) && (
+                  <span className="rounded-full bg-butter px-2 py-0.5 text-[11px] font-bold text-butter-deep dark:bg-butter-deep/25 dark:text-butter">
+                    has a number — tap to speak
+                  </span>
+                )}
+              </span>
             </div>
 
             {candidates.length > 0 ? (
@@ -229,11 +253,11 @@ export default function LiveCapture({ onNavigate }) {
               disabled={!result?.text}
               onClick={() => {
                 unlockSound();
-                play(result);
+                play(spoken(result));
               }}
               className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-md shadow-accent/30 transition hover:bg-accent-strong disabled:opacity-40 disabled:shadow-none"
             >
-              {result?.text ? `Speak it — "${result.text}"` : "Speak it"}
+              {result?.text ? `Speak it — "${spoken(result).text}"` : "Speak it"}
             </button>
 
             {typing ? (
@@ -293,7 +317,7 @@ export default function LiveCapture({ onNavigate }) {
               disabled={!result?.text}
               onClick={() => {
                 unlockSound();
-                play(result);
+                play(spoken(result));
               }}
               className="grid size-14 place-items-center rounded-full border border-line text-muted transition hover:text-body disabled:opacity-40 dark:border-line-dark dark:hover:text-white"
             >

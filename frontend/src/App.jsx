@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSettings } from "./settings.js";
 import Welcome from "./screens/Welcome.jsx";
 import Setup from "./screens/Setup.jsx";
 import LiveCapture from "./screens/LiveCapture.jsx";
@@ -19,7 +20,9 @@ export default function App() {
     const hash = window.location.hash.slice(1);
     return SCREENS.some((s) => s.id === hash) ? hash : "welcome";
   });
-  const [dark, setDark] = useState(false);
+  const [settings, updateSettings] = useSettings();
+  const dark = settings.theme === "dark";
+  const toggleDark = () => updateSettings({ theme: dark ? "light" : "dark" });
 
   useEffect(() => {
     window.location.hash = screen;
@@ -39,11 +42,15 @@ export default function App() {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
+  useEffect(() => {
+    document.documentElement.style.setProperty("--text-scale", settings.textScale);
+  }, [settings.textScale]);
+
   const Active = SCREENS.find((s) => s.id === screen).component;
 
   return (
     <div className="app-bg h-full overflow-y-auto text-body dark:text-white">
-      <Active onNavigate={setScreen} dark={dark} onToggleDark={() => setDark((d) => !d)} />
+      <Active onNavigate={setScreen} dark={dark} onToggleDark={toggleDark} />
 
       {/* Demo-only chrome: lets the team flip between mockups and themes */}
       <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card p-1 shadow-lg shadow-black/10 dark:border-line-dark dark:bg-panel">
@@ -61,7 +68,7 @@ export default function App() {
           </button>
         ))}
         <button
-          onClick={() => setDark((d) => !d)}
+          onClick={toggleDark}
           title="Toggle dark / light"
           className="ml-1 grid size-8 place-items-center rounded-full text-muted transition hover:text-body dark:hover:text-white"
         >
