@@ -1,8 +1,4 @@
-# Core: enough to run the whole app with fallbacks, and the tests.
-# Each module has its own requirements.txt for its heavy/optional dependencies.
-fastapi>=0.110
-uvicorn[standard]>=0.29
-python-multipart>=0.0.9
-python-dotenv>=1.0
-httpx2>=2.0
-pytest>=8.0
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
