@@ -1,6 +1,7 @@
 """Connects everyone's files into the app. You shouldn't need to edit this one.
 
 Run from backend/:  uvicorn server:app --reload --host 0.0.0.0 --port 8000
+Offline phone demo: python server.py  (HTTPS when ../certs exists, see offline-demo-instructions.md)
 """
 
 import base64
@@ -113,3 +114,21 @@ def hang_up():
 # otherwise the raw frontend/ folder. Build with: cd frontend && npm install && npm run build
 FRONTEND = Path(__file__).parent.parent / "frontend"
 app.mount("/", StaticFiles(directory=FRONTEND / "dist" if (FRONTEND / "dist").is_dir() else FRONTEND, html=True))
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    CERTS = Path(__file__).parent.parent / "certs"
+    https = (CERTS / "server.pem").is_file() and (CERTS / "server.key").is_file()
+    if https:
+        print("Serving HTTPS on port 8000")
+    else:
+        print("No certs/ found, serving plain HTTP on port 8000 (run scripts/setup_network.sh certs for HTTPS)")
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        ssl_certfile=str(CERTS / "server.pem") if https else None,
+        ssl_keyfile=str(CERTS / "server.key") if https else None,
+    )
