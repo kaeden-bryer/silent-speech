@@ -43,8 +43,8 @@ function Toggle({ on, onChange }) {
       }`}
     >
       <span
-        className={`absolute top-1 size-5 rounded-full bg-white shadow transition-all ${
-          on ? "left-6" : "left-1"
+        className={`absolute left-1 top-1/2 size-5 -translate-y-1/2 rounded-full bg-white shadow transition-transform ${
+          on ? "translate-x-[1.25rem]" : "translate-x-0"
         }`}
       />
     </button>

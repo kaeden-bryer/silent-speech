@@ -75,6 +75,32 @@ body {
   --color-muted: #a49eb0;
 }
 
+/* Quick screen-change transitions (disabled by prefers-reduced-motion below) */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes screen-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.screen-enter {
+  animation: screen-in 0.2s ease-out both;
+}
+.screen-enter-right {
+  animation: screen-in-right 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
 /* Keyboard users get a clear, consistent focus ring */
 :focus-visible {
   outline: 2px solid var(--color-accent);

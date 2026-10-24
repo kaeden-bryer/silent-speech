@@ -11,7 +11,6 @@ import { EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
 const CHANNELS = [
   { label: "Speaker", icon: paths.speaker, active: true },
   { label: "Phone call", icon: paths.phone },
-  { label: "Meeting", icon: paths.camera },
 ];
 
 export default function LiveCapture({ onNavigate }) {
@@ -27,6 +26,9 @@ export default function LiveCapture({ onNavigate }) {
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
   const [speaking, setSpeaking] = useState(false);
+  // Speaking happens live; the card is verification after the fact unless the
+  // number gate (or auto-speak off) held the sentence for approval.
+  const [spokenAuto, setSpokenAuto] = useState(false);
 
   function speakNow(r) {
     setSpeaking(true);
@@ -76,9 +78,11 @@ export default function LiveCapture({ onNavigate }) {
       const r = await request;
       setResult(r);
       const s = getSettings();
+      const autoSpeakNow = Boolean(r.text) && s.autoSpeak && !(s.confirmNumbers && /\d/.test(r.text));
+      setSpokenAuto(autoSpeakNow);
       if (!r.text) {
         setError("Didn't catch that — mouth one short sentence, or type it.");
-      } else if (s.autoSpeak && !(s.confirmNumbers && /\d/.test(r.text))) {
+      } else if (autoSpeakNow) {
         speakNow(r);
       }
     } catch (err) {
@@ -100,7 +104,7 @@ export default function LiveCapture({ onNavigate }) {
 
   const candidates = result?.text
     ? [
-        { text: result.text, note: "best match", picked: true },
+        { text: result.text, note: spokenAuto ? "spoken ✓" : "best match", picked: true },
         ...(result.raw_text && result.raw_text !== result.text
           ? [{ text: result.raw_text, note: "as read" }]
           : []),
@@ -181,13 +185,9 @@ export default function LiveCapture({ onNavigate }) {
           )}
 
           {cameraOn && (
-            <>
-              <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-                {recording ? "Reading your lips…" : "Camera on ✓"}
-              </div>
-              {/* lip-tracking guide */}
-              <div className="absolute left-1/2 top-[58%] h-10 w-24 -translate-x-1/2 rounded-xl border-2 border-track/90" />
-            </>
+            <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
+              {recording ? "Reading your lips…" : "Camera on ✓"}
+            </div>
           )}
 
           {(busy || result?.raw_text) && (
@@ -207,7 +207,7 @@ export default function LiveCapture({ onNavigate }) {
           <div className="rounded-2xl border border-line bg-card p-4 dark:border-line-dark dark:bg-panel">
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold tracking-widest text-muted uppercase">
-                Did you say…
+                {spokenAuto ? "What you said" : "Did you say…"}
               </span>
               <span className="flex items-center gap-1.5">
                 {result?.emotion && result.emotion !== "neutral" && <EmotionChip emotion={result.emotion} />}
@@ -259,7 +259,11 @@ export default function LiveCapture({ onNavigate }) {
               }}
               className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-accent transition hover:bg-accent-strong disabled:opacity-40 disabled:shadow-none"
             >
-              {result?.text ? `Speak it — "${result.text}"` : "Speak it"}
+              {spokenAuto
+                ? "Say it again"
+                : result?.text
+                  ? `Speak it — "${result.text}"`
+                  : "Speak it"}
             </button>
 
             {typing ? (
@@ -286,8 +290,8 @@ export default function LiveCapture({ onNavigate }) {
             )}
           </div>
 
-          {/* Record controls */}
-          <div className="flex items-center justify-center gap-[24px] py-2">
+          {/* Record controls: first on phones so recording never needs a scroll */}
+          <div className="order-first flex items-center justify-center gap-[24px] py-2 md:order-none">
             <button
               title="Keyboard fallback"
               aria-label="Keyboard fallback"

@@ -50,7 +50,10 @@ export default function App() {
 
   return (
     <div className="app-bg h-full overflow-y-auto text-body dark:text-white">
-      <Active onNavigate={setScreen} dark={dark} onToggleDark={toggleDark} />
+      {/* key remounts the screen so the enter transition plays on navigation */}
+      <div key={screen} className={`h-full ${screen === "settings" ? "screen-enter-right" : "screen-enter"}`}>
+        <Active onNavigate={setScreen} dark={dark} onToggleDark={toggleDark} />
+      </div>
 
       {/* Demo-only chrome: lets the team flip between mockups and themes */}
       <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card p-1 shadow-lg shadow-black/10 dark:border-line-dark dark:bg-panel">
@@ -67,13 +70,6 @@ export default function App() {
             {s.label}
           </button>
         ))}
-        <button
-          onClick={toggleDark}
-          title="Toggle dark / light"
-          className="ml-1 grid size-8 place-items-center rounded-full text-muted transition hover:text-body dark:hover:text-white"
-        >
-          {dark ? "☀️" : "🌙"}
-        </button>
       </div>
     </div>
   );

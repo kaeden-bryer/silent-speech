@@ -43,8 +43,7 @@ export default function Welcome({ onNavigate }) {
           Your voice, anywhere
         </h1>
         <p className="mx-auto mt-3 max-w-sm text-base leading-relaxed text-muted">
-          Mouth words at the camera and they're spoken aloud in your own
-          voice — on phone calls, in person, or in a meeting.
+          Mouth words at the camera and you will be able to speak out loud
         </p>
 
         <button
