@@ -271,9 +271,6 @@ export default function LiveCapture({ onNavigate }) {
                 {candidates.length > 0 ? "None of these — type it" : "Type instead"}
               </button>
             )}
-            <p className="mt-3 text-center text-xs text-muted">
-              Dates, numbers and addresses always need a tap before they're spoken.
-            </p>
           </div>
 
           {/* Record controls */}
