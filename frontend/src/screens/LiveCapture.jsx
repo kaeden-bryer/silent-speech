@@ -294,7 +294,7 @@ export default function LiveCapture({ onNavigate }) {
               {recording ? (
                 <span className="size-6 rounded-md bg-white" />
               ) : (
-                <Icon d={paths.camera} className="size-7" />
+                <Icon d={cameraOn ? paths.speaker : paths.camera} className="size-7" />
               )}
             </button>
             <button
