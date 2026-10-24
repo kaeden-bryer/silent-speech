@@ -109,5 +109,7 @@ def hang_up():
     return {"ok": True}
 
 
-# The website (frontend/index.html) at http://localhost:8000
-app.mount("/", StaticFiles(directory=Path(__file__).parent.parent / "frontend", html=True))
+# The website at http://localhost:8000: the built app (frontend/dist) when it exists,
+# otherwise the raw frontend/ folder. Build with: cd frontend && npm install && npm run build
+FRONTEND = Path(__file__).parent.parent / "frontend"
+app.mount("/", StaticFiles(directory=FRONTEND / "dist" if (FRONTEND / "dist").is_dir() else FRONTEND, html=True))

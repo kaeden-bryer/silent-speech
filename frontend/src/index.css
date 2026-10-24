@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Pastel multicolor palette from the team's swatches:
+     #FFCBE1 pink · #D6E5BD green · #F9E1A8 yellow · #BCD8EC blue · #DCCCEC lilac · #FFDAB4 peach.
+     Pink leads; each pastel gets a readable "deep" text tone. */
+  --color-accent: #5878c8;
+  --color-accent-strong: #4867b6;
+  --color-accent-soft: #e7ecf8;
+
+  --color-blush: #ffcbe1;
+  --color-blush-deep: #b8336e;
+  --color-mint: #d6e5bd;
+  --color-mint-deep: #5a7c36;
+  --color-butter: #f9e1a8;
+  --color-butter-deep: #92701c;
+  --color-sky: #bcd8ec;
+  --color-sky-deep: #2d6a9f;
+  --color-lavender: #dcccec;
+  --color-lavender-deep: #7352a5;
+  --color-peach: #ffdab4;
+  --color-peach-deep: #a35c17;
+
+  --color-ink: #222433; /* app background, dark (slate-navy tint) */
+  --color-panel: #2c2f40; /* raised cards, dark */
+  --color-panel-2: #373b52; /* hover / inset, dark */
+  --color-line-dark: #434862;
+
+  --color-paper: #faf8f2; /* app background, light (cream) */
+  --color-card: #ffffff;
+  --color-line: #ece8de;
+
+  --color-body: #2b2735; /* primary text, light mode */
+  --color-muted: #837d8e; /* secondary text, both modes */
+}
+
+/* Everything is rem-based, so scaling the root scales the whole UI */
+html {
+  font-size: 17px;
+}
+@media (min-width: 1024px) {
+  html {
+    font-size: 19px;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Mobile browsers: track the real visible height as toolbars collapse */
+#root {
+  height: 100dvh;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soft pastel wash over the cream background, like the reference design */
+.app-bg {
+  background:
+    radial-gradient(50% 36% at 0% 0%, rgba(188, 216, 236, 0.45), transparent 70%),
+    radial-gradient(55% 40% at 100% 0%, rgba(255, 218, 180, 0.35), transparent 70%),
+    radial-gradient(45% 35% at 100% 100%, rgba(214, 229, 189, 0.35), transparent 72%),
+    radial-gradient(50% 40% at 0% 100%, rgba(220, 204, 236, 0.35), transparent 72%),
+    var(--color-paper);
+}
+
+.dark .app-bg {
+  background:
+    radial-gradient(55% 40% at 0% 0%, rgba(88, 120, 200, 0.14), transparent 70%),
+    radial-gradient(60% 45% at 100% 100%, rgba(220, 204, 236, 0.08), transparent 72%),
+    var(--color-ink);
+}
