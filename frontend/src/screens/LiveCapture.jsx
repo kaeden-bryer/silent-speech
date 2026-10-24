@@ -113,7 +113,6 @@ export default function LiveCapture({ onNavigate }) {
         <Logo className="size-10" />
         <div className="min-w-0 flex-1">
           <div className="text-base font-extrabold">Silent Speech</div>
-          <div className="truncate text-sm text-muted">Speaker mode — speaks out loud on this device</div>
         </div>
         <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${status.tone}`}>
           <span className={`size-1.5 rounded-full ${status.dot}`} />
