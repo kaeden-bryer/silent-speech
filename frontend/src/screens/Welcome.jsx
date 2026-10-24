@@ -48,16 +48,16 @@ export default function Welcome({ onNavigate }) {
         </p>
 
         <button
-          onClick={() => onNavigate("setup")}
+          onClick={() => onNavigate("live")}
           className="mt-8 w-full rounded-2xl bg-accent py-3.5 font-bold text-white shadow-lg shadow-accent/30 transition hover:bg-accent-strong"
         >
-          Set up your voice
+          Start speaking
         </button>
         <button
-          onClick={() => onNavigate("chat")}
+          onClick={() => onNavigate("setup")}
           className="mt-3 w-full rounded-2xl py-3 text-sm font-semibold text-muted transition hover:text-body dark:hover:text-white"
         >
-          Try a call first
+          Set up your voice first
         </button>
       </div>
     </div>

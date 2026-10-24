@@ -27,7 +27,7 @@ function Card({ icon, iconTone, title, subtitle, step, children }) {
           <p className="text-sm text-muted">{subtitle}</p>
         </div>
         {step && (
-          <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-bold text-accent-strong dark:bg-accent/15 dark:text-accent">
+          <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-bold text-accent-strong dark:bg-accent/15 dark:text-accent-tint">
             {step}
           </span>
         )}
@@ -135,10 +135,10 @@ export default function Setup({ onNavigate }) {
       </Card>
 
       <button
-        onClick={() => onNavigate("chat")}
+        onClick={() => onNavigate("live")}
         className="mt-6 w-full rounded-2xl bg-accent py-3.5 font-bold text-white shadow-lg shadow-accent/30 transition hover:bg-accent-strong"
       >
-        Done — make a call
+        Done — start speaking
       </button>
     </div>
   );

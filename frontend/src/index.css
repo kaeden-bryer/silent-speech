@@ -8,22 +8,24 @@
   /* Pastel multicolor palette from the team's swatches:
      #FFCBE1 pink · #D6E5BD green · #F9E1A8 yellow · #BCD8EC blue · #DCCCEC lilac · #FFDAB4 peach.
      Pink leads; each pastel gets a readable "deep" text tone. */
-  --color-accent: #5878c8;
-  --color-accent-strong: #4867b6;
+  /* "-deep" tones are tuned to >= 4.5:1 WCAG contrast on their pastel */
+  --color-accent: #4d6cc0;
+  --color-accent-strong: #3f5bab;
   --color-accent-soft: #e7ecf8;
+  --color-accent-tint: #b3c4f2; /* accent-colored text on dark panels */
 
   --color-blush: #ffcbe1;
-  --color-blush-deep: #b8336e;
+  --color-blush-deep: #9e2a5c;
   --color-mint: #d6e5bd;
-  --color-mint-deep: #5a7c36;
+  --color-mint-deep: #46652a;
   --color-butter: #f9e1a8;
-  --color-butter-deep: #92701c;
+  --color-butter-deep: #755810;
   --color-sky: #bcd8ec;
-  --color-sky-deep: #2d6a9f;
+  --color-sky-deep: #27587f;
   --color-lavender: #dcccec;
-  --color-lavender-deep: #7352a5;
+  --color-lavender-deep: #5c3f8a;
   --color-peach: #ffdab4;
-  --color-peach-deep: #a35c17;
+  --color-peach-deep: #7e450c;
 
   --color-ink: #222433; /* app background, dark (slate-navy tint) */
   --color-panel: #2c2f40; /* raised cards, dark */
@@ -35,7 +37,7 @@
   --color-line: #ece8de;
 
   --color-body: #2b2735; /* primary text, light mode */
-  --color-muted: #837d8e; /* secondary text, both modes */
+  --color-muted: #767085; /* secondary text (lighter in dark mode, see below) */
 }
 
 /* Everything is rem-based, so scaling the root scales the whole UI */
@@ -62,6 +64,11 @@ body,
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Muted text needs to be lighter on dark panels to stay readable */
+.dark {
+  --color-muted: #a49eb0;
 }
 
 /* Soft pastel wash over the cream background, like the reference design */

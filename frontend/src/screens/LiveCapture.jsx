@@ -1,33 +1,59 @@
-import { Icon, paths } from "../components/ui.jsx";
+import { Icon, Logo, paths } from "../components/ui.jsx";
 
-// The trust point of the whole app (see research brief): the user picks among
-// the top 3 readings, and numbers/doses/addresses always need a tap before
-// they are spoken. Mocked at the demo's key moment: the date of birth.
+// The app's home screen: mouth a sentence, pick what you said, it's spoken
+// aloud. One engine, several output channels (speaker, phone call, meeting).
+// Top-3 pick is the trust point from the research brief; candidates mock the
+// backend's demo_phrases.txt.
 const CANDIDATES = [
-  { text: "March 14th, 1986", confidence: "92%", picked: true },
-  { text: "March 15th, 1986", confidence: "78%" },
-  { text: "May 14th, 1986", confidence: "41%" },
+  { text: "I need more caffeine.", confidence: "92%", picked: true },
+  { text: "I need more coffee in.", confidence: "78%" },
+  { text: "I knead more caffeine.", confidence: "41%" },
+];
+
+const CHANNELS = [
+  { label: "Speaker", icon: paths.speaker, active: true },
+  { label: "Phone call", icon: paths.phone },
+  { label: "Meeting", icon: paths.camera },
 ];
 
 export default function LiveCapture({ onNavigate }) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-24 pt-5 md:max-w-5xl">
       <header className="mb-4 flex items-center gap-3">
-        <button
-          onClick={() => onNavigate("chat")}
-          className="grid size-10 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-        >
-          <Icon d={paths.back} className="size-5.5" />
-        </button>
+        <Logo className="size-10" />
         <div className="flex-1">
-          <div className="text-sm font-extrabold"># pharmacy</div>
-          <div className="text-xs text-muted">They asked: "name and date of birth?"</div>
+          <div className="text-base font-extrabold">Silent Speech</div>
+          <div className="text-sm text-muted">Speaker mode — speaks out loud on this device</div>
         </div>
         <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-500">
           <span className="size-1.5 animate-pulse rounded-full bg-red-500" />
           READING
         </span>
+        <button
+          title="Settings"
+          onClick={() => onNavigate("settings")}
+          className="grid size-10 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
+        >
+          <Icon d={paths.settings} className="size-5.5" />
+        </button>
       </header>
+
+      {/* Output channel: where the voice goes */}
+      <div className="mb-4 flex gap-2 overflow-x-auto [scrollbar-width:none]">
+        {CHANNELS.map((c) => (
+          <button
+            key={c.label}
+            className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+              c.active
+                ? "bg-accent text-white shadow-md shadow-accent/30"
+                : "border border-line bg-card text-muted hover:text-body dark:border-line-dark dark:bg-panel dark:hover:text-white"
+            }`}
+          >
+            <Icon d={c.icon} className="size-4.5" />
+            {c.label}
+          </button>
+        ))}
+      </div>
 
       {/* Side by side on desktop, stacked on phones */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start">
@@ -57,7 +83,7 @@ export default function LiveCapture({ onNavigate }) {
               Reading…
             </div>
             <div className="text-sm font-semibold text-white">
-              march fourteenth nineteen eighty…
+              i need more caffe…
             </div>
           </div>
         </div>
@@ -69,9 +95,6 @@ export default function LiveCapture({ onNavigate }) {
               <span className="text-[11px] font-bold tracking-widest text-muted uppercase">
                 Did you say…
               </span>
-              <span className="rounded-full bg-butter px-2 py-0.5 text-[11px] font-bold text-butter-deep dark:bg-butter-deep/25 dark:text-butter">
-                contains a date — confirm to speak
-              </span>
             </div>
 
             <div className="space-y-2">
@@ -80,7 +103,7 @@ export default function LiveCapture({ onNavigate }) {
                   key={c.text}
                   className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-base font-semibold transition ${
                     c.picked
-                      ? "border-accent bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent"
+                      ? "border-accent bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint"
                       : "border-line text-body/80 hover:border-accent/50 dark:border-line-dark dark:text-white/80"
                   }`}
                 >
@@ -91,12 +114,15 @@ export default function LiveCapture({ onNavigate }) {
             </div>
 
             <button className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-md shadow-accent/30 transition hover:bg-accent-strong">
-              Speak it — "March 14th, 1986"
+              Speak it — "I need more caffeine."
             </button>
             <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2.5 text-sm font-bold text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white">
               <Icon d={paths.keyboard} className="size-5" />
               None of these — type it
             </button>
+            <p className="mt-3 text-center text-xs text-muted">
+              Dates, numbers and addresses always need a tap before they're spoken.
+            </p>
           </div>
 
           {/* Record controls */}

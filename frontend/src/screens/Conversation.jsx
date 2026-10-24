@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Avatar, EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
 
+// PARKED IDEA — the phone-call channel. Not registered in App's nav right now;
+// kept because the sidebar + captions + quick-phrases layout is where the
+// Twilio call UI would live. Re-add to SCREENS in App.jsx to bring it back.
+//
 // Mock data shaped like GET /api/history, so wiring it up later is mechanical.
 // speaker: "me" = our user, "them" = the person on the other end.
 const HISTORY = [
@@ -64,7 +68,7 @@ export default function Conversation({ onNavigate }) {
               onClick={() => setMenuOpen(false)}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 s.active
-                  ? "bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent"
+                  ? "bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint"
                   : "text-muted hover:bg-paper hover:text-body dark:hover:bg-panel-2 dark:hover:text-white"
               }`}
             >
@@ -171,7 +175,7 @@ export default function Conversation({ onNavigate }) {
             <button
               onClick={() => onNavigate("live")}
               title="Speak silently on camera"
-              className="grid size-11 shrink-0 place-items-center rounded-xl bg-lavender text-lavender-deep transition hover:bg-accent hover:text-white dark:bg-accent/15 dark:text-accent"
+              className="grid size-11 shrink-0 place-items-center rounded-xl bg-lavender text-lavender-deep transition hover:bg-accent hover:text-white dark:bg-accent/15 dark:text-accent-tint"
             >
               <Icon d={paths.camera} />
             </button>

@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import Welcome from "./screens/Welcome.jsx";
 import Setup from "./screens/Setup.jsx";
-import Conversation from "./screens/Conversation.jsx";
 import LiveCapture from "./screens/LiveCapture.jsx";
+import Settings from "./screens/Settings.jsx";
+// The call screen (screens/Conversation.jsx) is parked for now — kept as an
+// idea for the phone-call channel, not registered in the nav.
 
 const SCREENS = [
   { id: "welcome", label: "Welcome", component: Welcome },
+  { id: "live", label: "Live", component: LiveCapture },
   { id: "setup", label: "Setup", component: Setup },
-  { id: "chat", label: "Call", component: Conversation },
-  { id: "live", label: "Live capture", component: LiveCapture },
+  { id: "settings", label: "Settings", component: Settings, hidden: true },
 ];
 
 export default function App() {
-  // #welcome / #chat / #live deep-link straight to a mockup
+  // #welcome / #live / #setup / #settings deep-link straight to a mockup
   const [screen, setScreen] = useState(() => {
     const hash = window.location.hash.slice(1);
     return SCREENS.some((s) => s.id === hash) ? hash : "welcome";
@@ -23,6 +25,16 @@ export default function App() {
     window.location.hash = screen;
   }, [screen]);
 
+  // Follow the browser's back/forward buttons and external hash changes
+  useEffect(() => {
+    const onHash = () => {
+      const hash = window.location.hash.slice(1);
+      if (SCREENS.some((s) => s.id === hash)) setScreen(hash);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
@@ -31,11 +43,11 @@ export default function App() {
 
   return (
     <div className="app-bg h-full overflow-y-auto text-body dark:text-white">
-      <Active onNavigate={setScreen} />
+      <Active onNavigate={setScreen} dark={dark} onToggleDark={() => setDark((d) => !d)} />
 
       {/* Demo-only chrome: lets the team flip between mockups and themes */}
       <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card p-1 shadow-lg shadow-black/10 dark:border-line-dark dark:bg-panel">
-        {SCREENS.map((s) => (
+        {SCREENS.filter((s) => !s.hidden).map((s) => (
           <button
             key={s.id}
             onClick={() => setScreen(s.id)}
