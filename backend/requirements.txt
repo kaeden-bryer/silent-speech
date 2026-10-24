@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+# Models (lipreading.py, tts.py, correction.py). Install torch first, see models/MANIFEST.md
+mediapipe
+opencv-python-headless
+sentencepiece
+scikit-image
+kokoro
+soundfile
+rapidfuzz

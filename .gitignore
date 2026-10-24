@@ -1,1 +1,8 @@
-.venv
+.venv/
+__pycache__/
+.env
+backend/recordings/
+.DS_Store
+third_party/
+models/*
+!models/MANIFEST.md
