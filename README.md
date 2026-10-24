@@ -21,6 +21,8 @@ Everyone works in their own file. Each file has one function that returns a fake
 
 ## Run
 
+Lip reading, voice and correction run locally on the Ascent GPU. One-time setup (models, CUDA torch): [`models/MANIFEST.md`](models/MANIFEST.md). Test the lip reader alone with `python lipreading.py clip.webm`. Demo phrases live in `backend/demo_phrases.txt`.
+
 ```bash
 cd backend
 pip install -r requirements.txt

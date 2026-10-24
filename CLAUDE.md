@@ -4,6 +4,13 @@
 
 Status: draft v0.1
 
+> **What's actually built (read first).** The code follows the team skeleton in `README.md`, not the client/server design below. Where this spec and the code disagree, the code wins:
+> - **Client** is the browser page `frontend/index.html` (works on the MacBook or a phone), not a Python app. A tap toggles recording, and the whole clip is uploaded with `POST /api/video`. There is no WebSocket `/stream` (§4, §6 are not implemented).
+> - **Server** is `backend/server.py` (FastAPI). It chains `lipreading.py` (Auto-AVSR + MediaPipe, §3/§5.2) → `correction.py` (rapidfuzz snap to `backend/demo_phrases.txt`) → `emotion.py` → `tts.py` (Kokoro, returns MP3). Each step falls back safely if it crashes.
+> - **No `config.yaml`**: settings are constants at the top of each backend file.
+> - **Setup, checkpoints and versions**: `models/MANIFEST.md`. Weights live in `models/` and the repo in `third_party/` (both gitignored).
+> - The models load and warm up when their module is imported (§5.1). A lock per model serializes GPU use (§5.3).
+
 ---
 
 ## 1. Overview
@@ -45,7 +52,7 @@ preview window + SPACE push-to-talk               frame buffer (per utterance)
                                                   mouth-ROI extraction (MediaPipe)
                                                     │  96×96 grayscale crops
                                                     ▼
-                                                VSR model (Auto-AVSR)  → text
+                                                  VSR model (Auto-AVSR)  → text
                                                     │
                                                     ▼
                                                   TTS model (Kokoro-82M) → PCM audio
@@ -186,44 +193,70 @@ server:
 
 ## 8. Setup: ASUS Ascent GX10 (server)
 
-The GX10 is an NVIDIA GB10 (Grace Blackwell) system: **aarch64 CPU + Blackwell GPU**, running NVIDIA's DGX OS (Ubuntu-based). The aarch64 part matters. Many pip wheels that "just work" on x86 either don't exist or lack CUDA support on ARM, which is why the recommended path below uses NVIDIA's prebuilt container.
+The GX10 is an NVIDIA GB10 (Grace Blackwell) system: **aarch64 CPU + Blackwell GPU** (compute capability 12.1, "sm_121"), running NVIDIA's DGX OS (Ubuntu-based). CUDA fully supports this machine. The setup risk is the **wheel ecosystem**: Blackwell needs CUDA 13, and many pip packages ship wheels built against CUDA 12.x or for x86 only. The path below uses PyTorch's official CUDA 13 aarch64 wheels in a plain virtualenv; a container is the documented fallback (§8.1.1).
 
-### 8.1 Base environment (recommended: NGC PyTorch container)
+### 8.1 Base environment (primary: native venv)
+
 ```bash
-# Pull NVIDIA's PyTorch container (pick the current tag from NGC / the GX10 docs)
-docker pull nvcr.io/nvidia/pytorch:<TAG>
+sudo apt update && sudo apt install -y espeak-ng ffmpeg libsndfile1 git python3-venv
+
+python3 -m venv .venv && source .venv/bin/activate
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+```
+
+**Verify the GPU build before installing anything else:**
+```python
+import torch
+print(torch.__version__, torch.version.cuda)
+print(torch.cuda.get_device_capability(0))   # expect (12, 1) on the GB10
+print(torch.cuda.get_arch_list())            # sm_120 and/or sm_121 should appear
+
+x = torch.randn(2048, 2048, device="cuda")
+y = (x @ x).sum()
+torch.cuda.synchronize()                     # force the kernel to actually finish
+print("ok", y.item())
+```
+- `torch.cuda.is_available()` alone only proves a driver was found, not that the wheel has kernels for this GPU. The matmul + `synchronize()` forces a real kernel launch, and the sync surfaces any asynchronous CUDA error here instead of at some unrelated line later.
+- Seeing `sm_120` but not `sm_121` is acceptable. CUDA code built for 12.0 runs on a 12.1 device (forward-compatible within the same major architecture). The red flag is an arch list that stops at `sm_90`, which means the build predates Blackwell.
+- Verified on this machine: `get_device_capability` returned `(12, 1)`.
+
+**Avoid on this platform unless you've confirmed they work:** `flash-attn` (no published aarch64 wheel; not needed here) and `onnxruntime-gpu` from PyPI (no official aarch64 + CUDA 13 wheel as of early 2026). Prefer CPU `onnxruntime` or pure-PyTorch paths.
+
+**Pip gotcha:** pip's resolver checks version numbers, not CUDA ABI, so a package can install cleanly and then fail at import. Install one thing at a time, import it right away, and never let a later `pip install -r` silently replace the CUDA 13 `torch` (if it tries, cancel and use `--no-deps` for that package).
+
+#### 8.1.1 Fallback: NGC PyTorch container
+Use this if the native venv fails verification or a dependency won't install and debugging isn't paying off. A container bundles a CUDA, cuDNN, and PyTorch combination NVIDIA has already tested on this hardware.
+```bash
+# Pick a recent tag from NGC. Older images do not support sm_121.
+docker pull nvcr.io/nvidia/pytorch:26.01-py3
 
 docker run --gpus all -it --rm --net=host --ipc=host \
   -v $PWD:/workspace/app -w /workspace/app \
-  nvcr.io/nvidia/pytorch:<TAG> bash
+  nvcr.io/nvidia/pytorch:26.01-py3 bash
 ```
-- `--net=host` exposes port 8000 directly on the machine's interfaces (no `-p` mapping to forget).
+- `--net=host` exposes port 8000 directly (no `-p` mapping to forget).
 - `--ipc=host` avoids shared-memory limits that break PyTorch data loading.
+- **Pull the image before going offline.** It is multiple GB and cannot be fetched at the venue.
+- Re-run the verification snippet above inside the container, then continue with §8.2 inside it.
 
-Verify the GPU is visible **before** installing anything else:
+### 8.2 Python dependencies (inside the venv)
 ```bash
-python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0))"
-```
-If this prints `False`, stop and fix it first; nothing downstream will use the GPU.
-
-*Alternative (no Docker):* a venv plus a CUDA-enabled aarch64 PyTorch wheel from the GX10 documentation. Only do this if you've confirmed `torch.cuda.is_available()` is `True`.
-
-### 8.2 System + Python dependencies
-```bash
-sudo apt update && sudo apt install -y espeak-ng ffmpeg libsndfile1 git
 pip install fastapi "uvicorn[standard]" numpy opencv-python-headless \
             mediapipe kokoro soundfile pyyaml rapidfuzz
+python -c "import mediapipe, kokoro, cv2; print('imports ok')"
 ```
-- `espeak-ng` is the grapheme-to-phoneme fallback Kokoro uses.
+- `espeak-ng` (installed in §8.1) is the grapheme-to-phoneme fallback Kokoro uses.
 - Use `opencv-python-headless` on the server (no display attached).
-- If `mediapipe` has no working aarch64 wheel, use the RetinaFace/face-alignment path from the Auto-AVSR repo and update §3.
+- **Test `mediapipe` first.** It is the likeliest package to lack a working aarch64 wheel. If it fails, use the RetinaFace/face-alignment path from the Auto-AVSR repo and update §3.
+- Re-run the §8.1 verification snippet afterward to confirm `torch` is still the CUDA 13 build.
 
 ### 8.3 Models
 ```bash
 # VSR
 git clone https://github.com/mpc001/auto_avsr third_party/auto_avsr
 # Download the pretrained VSR checkpoint linked in its README → models/vsr_checkpoint.pth
-pip install -r third_party/auto_avsr/requirements.txt   # skip pins that fight with the NGC torch
+# Do NOT blindly run its requirements.txt: it may pin a torch that replaces the CUDA 13 build.
+# Install its other dependencies individually (or with --no-deps) and re-verify torch afterward.
 
 # TTS (cache weights locally while you still have internet)
 python -c "from kokoro import KPipeline; KPipeline(lang_code='a')"
@@ -337,7 +370,7 @@ First-request latency will be much worse than steady state because of CUDA kerne
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Lip-reading accuracy too low on new faces/lighting | Demo shows wrong words | Phrase-matching safety net; short phrases; fixed lighting and camera; show transcript |
-| Wrong aarch64 wheels / CPU-only PyTorch | Slow or failing inference | NGC container; check `torch.cuda.is_available()` first |
+| Wheel built for wrong CUDA version / x86 only, or a package replaces CUDA 13 `torch` | Slow or failing inference | Native venv with `cu130` wheels; run the matmul verification (§8.1) after every install batch; NGC container as fallback |
 | Ethernet adapter failure | No link | Spare adapter; travel-router and hotspot backups |
 | Model tries to download at startup | Server hangs offline | Offline env vars; rehearsal with WiFi off |
 | macOS camera permission denied | Black frames | Grant permission and test before the demo |
@@ -377,4 +410,4 @@ First-request latency will be much worse than steady state because of CUDA kerne
 - Confirm the interpretation in §1 (lip reading → TTS, not audio → talking face).
 - What phrases will the demo use? (Drives `demo_phrases.txt` and how much to rely on the matcher.)
 - Which presenter(s) need to be tested against the VSR model?
-- Does the Ascent run containers in the demo environment, or must it run natively?
+- Has the fallback NGC container image been pulled and tested while internet was still available (only needed if the native venv fails)?
