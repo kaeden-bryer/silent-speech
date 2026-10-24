@@ -10,7 +10,7 @@ function Card({ icon, iconTone, title, children }) {
   return (
     <section className="mt-4 rounded-3xl border border-line bg-card p-5 shadow-sm shadow-black/5 first:mt-0 dark:border-line-dark dark:bg-panel">
       <div className="mb-4 flex items-center gap-3">
-        <span className={`grid size-11 shrink-0 place-items-center rounded-2xl ${iconTone}`}>
+        <span className={`grid size-[46px] shrink-0 place-items-center rounded-2xl ${iconTone}`}>
           <Icon d={icon} className="size-5.5" />
         </span>
         <h2 className="text-base font-extrabold">{title}</h2>
@@ -79,6 +79,7 @@ export default function Settings({ onNavigate }) {
       <header className="mb-6 flex items-center gap-3">
         <button
           onClick={() => onNavigate("live")}
+          aria-label="Back to live capture"
           className="grid size-10 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
         >
           <Icon d={paths.back} className="size-5.5" />
@@ -167,7 +168,7 @@ export default function Settings({ onNavigate }) {
         iconTone="bg-peach text-peach-deep dark:bg-peach-deep/25 dark:text-peach"
         title="Phrase bank"
       >
-        <Row label="3 saved phrases" detail="Name, date of birth, pharmacy">
+        <Row label={`${settings.phrases.length} saved phrase${settings.phrases.length === 1 ? "" : "s"}`} detail="One tap, never misread">
           <button
             onClick={() => onNavigate("setup")}
             className="rounded-full bg-accent-soft px-3.5 py-1.5 text-sm font-bold text-accent-strong transition hover:bg-accent hover:text-white dark:bg-accent/15 dark:text-accent-tint"

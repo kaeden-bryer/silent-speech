@@ -183,7 +183,7 @@ export default function Conversation({ onNavigate }) {
               placeholder="…or type a sentence instead"
               className="min-w-0 flex-1 bg-transparent px-2 text-base outline-none placeholder:text-muted"
             />
-            <button className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white shadow-md shadow-accent/30 transition hover:bg-accent-strong">
+            <button className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white shadow-accent transition hover:bg-accent-strong">
               <Icon d={paths.send} className="size-5.5" />
             </button>
           </div>

@@ -49,7 +49,7 @@ export default function Welcome({ onNavigate }) {
 
         <button
           onClick={() => onNavigate("live")}
-          className="mt-8 w-full rounded-2xl bg-accent py-3.5 font-bold text-white shadow-lg shadow-accent/30 transition hover:bg-accent-strong"
+          className="mt-8 w-full rounded-2xl bg-accent py-3.5 font-bold text-white shadow-accent transition hover:bg-accent-strong"
         >
           Start speaking
         </button>

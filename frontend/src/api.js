@@ -32,18 +32,23 @@ export const api = {
   hangup: () => request("/api/hangup", { method: "POST" }),
 };
 
-// result.audio is base64 MP3, or null -> speak result.text with the browser voice
-export function play(result, { onFallback } = {}) {
+// result.audio is base64 MP3, or null -> speak result.text with the browser voice.
+// onEnd fires when playback finishes (or immediately if nothing can play).
+export function play(result, { onEnd } = {}) {
   if (result.audio) {
-    new Audio("data:audio/mpeg;base64," + result.audio).play().catch(() => speak(result.text));
+    const audio = new Audio("data:audio/mpeg;base64," + result.audio);
+    audio.onended = () => onEnd?.();
+    audio.play().catch(() => speak(result.text, { onEnd }));
   } else {
-    speak(result.text);
-    onFallback?.();
+    speak(result.text, { onEnd });
   }
 }
 
-export function speak(text) {
-  if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+export function speak(text, { onEnd } = {}) {
+  if (!("speechSynthesis" in window)) return void onEnd?.();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.onend = () => onEnd?.();
+  speechSynthesis.speak(utterance);
 }
 
 // iPhones only allow sound after a tap: call this inside the first tap handler.

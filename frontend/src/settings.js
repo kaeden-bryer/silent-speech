@@ -13,6 +13,11 @@ const DEFAULTS = {
   captions: true,
   openingLine: true,
   filler: false,
+  phrases: [
+    "My name is Cara Lee",
+    "My date of birth is March 14, 1986",
+    "I pick up at the Mission St pharmacy",
+  ],
 };
 
 let state = { ...DEFAULTS };

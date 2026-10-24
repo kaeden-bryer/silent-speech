@@ -26,6 +26,12 @@ export default function LiveCapture({ onNavigate }) {
   const [error, setError] = useState(null);
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
+  const [speaking, setSpeaking] = useState(false);
+
+  function speakNow(r) {
+    setSpeaking(true);
+    play(r, { onEnd: () => setSpeaking(false) });
+  }
 
   // Stop the camera when leaving the screen
   useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
@@ -73,7 +79,7 @@ export default function LiveCapture({ onNavigate }) {
       if (!r.text) {
         setError("Didn't catch that — mouth one short sentence, or type it.");
       } else if (s.autoSpeak && !(s.confirmNumbers && /\d/.test(r.text))) {
-        play(r);
+        speakNow(r);
       }
     } catch (err) {
       setError(`Backend error: ${err.message}`);
@@ -105,21 +111,27 @@ export default function LiveCapture({ onNavigate }) {
     ? { label: "READING", tone: "bg-red-500/10 text-red-500", dot: "bg-red-500 animate-pulse" }
     : busy
       ? { label: "THINKING", tone: "bg-butter text-butter-deep dark:bg-butter-deep/25 dark:text-butter", dot: "bg-butter-deep animate-pulse" }
-      : { label: cameraOn ? "READY" : "CAMERA OFF", tone: "bg-mint text-mint-deep dark:bg-mint-deep/25 dark:text-mint", dot: "bg-mint-deep" };
+      : speaking
+        ? { label: "SPEAKING", tone: "bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint", dot: "bg-accent animate-pulse" }
+        : { label: cameraOn ? "READY" : "CAMERA OFF", tone: "bg-mint text-mint-deep dark:bg-mint-deep/25 dark:text-mint", dot: "bg-mint-deep" };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-24 pt-5 md:max-w-5xl">
-      <header className="mb-4 flex items-center gap-3">
-        <Logo className="size-10" />
+    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-24 pt-5 md:max-w-[1024px]">
+      <header className="mb-4 flex items-center gap-3 md:mb-7">
+        <Logo className="size-[40px]" />
         <div className="min-w-0 flex-1">
-          <div className="text-base font-extrabold">Silent Speech</div>
+          <div className="text-base font-extrabold md:text-2xl md:tracking-tight">Silent Speech</div>
         </div>
-        <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${status.tone}`}>
+        <span
+          role="status"
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${status.tone}`}
+        >
           <span className={`size-1.5 rounded-full ${status.dot}`} />
           {status.label}
         </span>
         <button
           title="Settings"
+          aria-label="Settings"
           onClick={() => onNavigate("settings")}
           className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
         >
@@ -128,13 +140,13 @@ export default function LiveCapture({ onNavigate }) {
       </header>
 
       {/* Output channel: where the voice goes */}
-      <div className="mb-4 flex gap-2 overflow-x-auto [scrollbar-width:none]">
+      <div className="mb-4 flex gap-2 overflow-x-auto [scrollbar-width:none] md:mb-7">
         {CHANNELS.map((c) => (
           <button
             key={c.label}
             className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
               c.active
-                ? "bg-accent text-white shadow-md shadow-accent/30"
+                ? "bg-accent text-white shadow-accent"
                 : "border border-line bg-card text-muted hover:text-body dark:border-line-dark dark:bg-panel dark:hover:text-white"
             }`}
           >
@@ -145,9 +157,9 @@ export default function LiveCapture({ onNavigate }) {
       </div>
 
       {/* Side by side on desktop, stacked on phones */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-start">
-        {/* Camera preview */}
-        <div className="relative aspect-[3/4] max-h-[48vh] w-full overflow-hidden rounded-3xl bg-panel shadow-xl shadow-black/20 md:max-h-none md:flex-1 dark:bg-panel-2">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+        {/* Camera preview: stays navy until a real stream is granted */}
+        <div className="relative aspect-[3/4] max-h-[48vh] w-full overflow-hidden rounded-3xl bg-camera shadow-xl shadow-black/20 md:max-h-none md:flex-1">
           <video
             ref={videoRef}
             autoPlay
@@ -158,28 +170,24 @@ export default function LiveCapture({ onNavigate }) {
 
           {!cameraOn && (
             <div className="absolute inset-0 grid place-items-center">
-              <div className="flex flex-col items-center gap-4">
-                <svg viewBox="0 0 200 260" className="w-40 text-muted/40" fill="none" stroke="currentColor" strokeWidth="3">
-                  <ellipse cx="100" cy="100" rx="55" ry="70" />
-                  <path d="M80 125 q20 14 40 0" strokeLinecap="round" />
-                  <circle cx="82" cy="88" r="4" fill="currentColor" stroke="none" />
-                  <circle cx="118" cy="88" r="4" fill="currentColor" stroke="none" />
-                </svg>
-                <button
-                  onClick={startCamera}
-                  className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-accent/40 transition hover:bg-accent-strong"
-                >
-                  <Icon d={paths.camera} className="size-5" />
-                  Start camera
-                </button>
-              </div>
+              <button
+                onClick={startCamera}
+                className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-accent transition hover:bg-accent-strong"
+              >
+                <Icon d={paths.camera} className="size-5" />
+                Start camera
+              </button>
             </div>
           )}
 
           {cameraOn && (
-            <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-              {recording ? "Reading your lips…" : "Camera on ✓"}
-            </div>
+            <>
+              <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
+                {recording ? "Reading your lips…" : "Camera on ✓"}
+              </div>
+              {/* lip-tracking guide */}
+              <div className="absolute left-1/2 top-[58%] h-10 w-24 -translate-x-1/2 rounded-xl border-2 border-track/90" />
+            </>
           )}
 
           {(busy || result?.raw_text) && (
@@ -195,7 +203,7 @@ export default function LiveCapture({ onNavigate }) {
         </div>
 
         {/* Result + confirm */}
-        <div className="flex flex-col gap-3 md:w-[26rem] md:shrink-0">
+        <div className="flex flex-col gap-3 md:w-[420px] md:shrink-0">
           <div className="rounded-2xl border border-line bg-card p-4 dark:border-line-dark dark:bg-panel">
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold tracking-widest text-muted uppercase">
@@ -216,14 +224,18 @@ export default function LiveCapture({ onNavigate }) {
                 {candidates.map((c) => (
                   <button
                     key={c.text}
-                    onClick={() => play({ ...result, text: c.text, audio: c.picked ? result.audio : null })}
+                    aria-pressed={c.picked}
+                    onClick={() => speakNow({ ...result, text: c.text, audio: c.picked ? result.audio : null })}
                     className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left text-base font-semibold transition ${
                       c.picked
-                        ? "border-accent bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint"
+                        ? "border-2 border-accent bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint"
                         : "border-line text-body/80 hover:border-accent/50 dark:border-line-dark dark:text-white/80"
                     }`}
                   >
-                    <span className="min-w-0 break-words">{c.text}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      {c.picked && <Icon d={paths.check} className="size-4.5 shrink-0" />}
+                      <span className="min-w-0 break-words">{c.text}</span>
+                    </span>
                     <span className={`shrink-0 text-xs ${c.picked ? "" : "text-muted"}`}>{c.note}</span>
                   </button>
                 ))}
@@ -234,16 +246,18 @@ export default function LiveCapture({ onNavigate }) {
               </p>
             )}
             {error && candidates.length > 0 && (
-              <p className="mt-2 text-center text-xs font-semibold text-red-500">{error}</p>
+              <p role="alert" className="mt-2 text-center text-xs font-semibold text-red-500">
+                {error}
+              </p>
             )}
 
             <button
               disabled={!result?.text}
               onClick={() => {
                 unlockSound();
-                play(result);
+                speakNow(result);
               }}
-              className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-md shadow-accent/30 transition hover:bg-accent-strong disabled:opacity-40 disabled:shadow-none"
+              className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-accent transition hover:bg-accent-strong disabled:opacity-40 disabled:shadow-none"
             >
               {result?.text ? `Speak it — "${result.text}"` : "Speak it"}
             </button>
@@ -273,22 +287,24 @@ export default function LiveCapture({ onNavigate }) {
           </div>
 
           {/* Record controls */}
-          <div className="flex items-center justify-center gap-8 py-2">
+          <div className="flex items-center justify-center gap-[24px] py-2">
             <button
               title="Keyboard fallback"
+              aria-label="Keyboard fallback"
               onClick={() => setTyping((t) => !t)}
-              className="grid size-14 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
+              className="grid size-[56px] place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
             >
               <Icon d={paths.keyboard} />
             </button>
             <button
               title={recording ? "Stop and speak" : cameraOn ? "Start reading" : "Start camera"}
+              aria-label={recording ? "Stop and speak" : cameraOn ? "Start reading" : "Start camera"}
               onClick={toggleRecord}
               disabled={busy}
-              className={`grid size-18 place-items-center rounded-full text-white shadow-xl ring-4 transition disabled:opacity-50 ${
+              className={`grid size-[72px] place-items-center rounded-full text-white ring-4 transition disabled:opacity-50 ${
                 recording
-                  ? "bg-red-500 shadow-red-500/40 ring-red-500/20 hover:bg-red-600"
-                  : "bg-accent shadow-accent/40 ring-accent/20 hover:bg-accent-strong"
+                  ? "bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/20 hover:bg-red-600"
+                  : "bg-accent shadow-accent ring-accent/20 hover:bg-accent-strong"
               }`}
             >
               {recording ? (
@@ -299,19 +315,17 @@ export default function LiveCapture({ onNavigate }) {
             </button>
             <button
               title="Replay last sentence"
+              aria-label="Replay last sentence"
               disabled={!result?.text}
               onClick={() => {
                 unlockSound();
-                play(result);
+                speakNow(result);
               }}
-              className="grid size-14 place-items-center rounded-full border border-line text-muted transition hover:text-body disabled:opacity-40 dark:border-line-dark dark:hover:text-white"
+              className="grid size-[56px] place-items-center rounded-full border border-line text-muted transition hover:text-body disabled:opacity-40 dark:border-line-dark dark:hover:text-white"
             >
               <Icon d={paths.speaker} />
             </button>
           </div>
-          <p className="-mt-2 text-center text-xs text-muted">
-            {recording ? "Mouth one sentence, then tap to stop" : cameraOn ? "Tap to start reading" : "Tap to turn on the camera"}
-          </p>
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
 export function Logo({ className = "size-10" }) {
   return (
     <div
-      className={`grid place-items-center rounded-2xl bg-gradient-to-br from-[#8ba1e2] to-accent text-white shadow-lg shadow-accent/30 ${className}`}
+      className={`grid place-items-center rounded-2xl bg-gradient-to-br from-[#8ba1e2] to-accent text-white shadow-accent ${className}`}
     >
       <svg viewBox="0 0 24 24" fill="none" className="size-1/2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
         {/* lips / soundwave mark */}
@@ -66,6 +66,7 @@ export const paths = {
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm8 3a8 8 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-2-1.2L15 3h-4l-.4 2.6a8 8 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a8 8 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 2 1.2L11 21h4l.4-2.6a8 8 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.2-.8.2-1.2z",
   back: "M15 18l-6-6 6-6",
   shield: "M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3zM9 12l2 2 4-4",
+  check: "M5 13l4 4L19 7",
   bookmark: "M7 4h10a1 1 0 0 1 1 1v16l-6-4-6 4V5a1 1 0 0 1 1-1z",
   keyboard: "M4 7h16a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zm3 3h0m4 0h0m4 0h0m-8 4h6",
 };
