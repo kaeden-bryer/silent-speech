@@ -4,7 +4,7 @@ python-multipart
 python-dotenv
 # Models (lipreading.py, tts.py, correction.py). Install torch first, see models/MANIFEST.md
 mediapipe
-opencv-python-headless
+opencv-python-headless<5  # 5.x removed CascadeClassifier (emotion.py)
 sentencepiece
 scikit-image
 kokoro
