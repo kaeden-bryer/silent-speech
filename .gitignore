@@ -1,1 +1,23 @@
-.venv
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Secrets
+.env
+
+# Local and heavy stuff: model weights, cloned repos, recordings, test outputs
+backend/models/
+backend/third_party/
+backend/data/
+
+# Node, if the frontend gets a build step
+node_modules/
+dist/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/

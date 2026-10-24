@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Silent Speech</title>
+</head>
+<body>
+  <!-- Bare test page for the backend contract. Track 1 replaces it with the real UI. -->
+  <h1>Silent Speech</h1>
+  <p id="status">Connecting…</p>
+
+  <video id="preview" autoplay playsinline muted width="320"></video>
+  <p>
+    <button id="camera-btn" type="button">Start camera</button>
+    <button id="record-btn" type="button" disabled>Record</button>
+  </p>
+
+  <form id="text-form">
+    <input id="text-input" placeholder="…or type a sentence">
+    <label><input id="fix-checkbox" type="checkbox" checked> correct it</label>
+    <button type="submit">Send</button>
+  </form>
+
+  <pre id="result"></pre>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
