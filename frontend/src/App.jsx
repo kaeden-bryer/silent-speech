@@ -3,6 +3,7 @@ import { useSettings } from "./settings.js";
 import Welcome from "./screens/Welcome.jsx";
 import Setup from "./screens/Setup.jsx";
 import LiveCapture from "./screens/LiveCapture.jsx";
+import Practice from "./screens/Practice.jsx";
 import Settings from "./screens/Settings.jsx";
 // The call screen (screens/Conversation.jsx) is parked for now — kept as an
 // idea for the phone-call channel, not registered in the nav.
@@ -10,6 +11,7 @@ import Settings from "./screens/Settings.jsx";
 const SCREENS = [
   { id: "welcome", label: "Welcome", component: Welcome },
   { id: "live", label: "Live", component: LiveCapture },
+  { id: "practice", label: "Practice", component: Practice },
   { id: "setup", label: "Setup", component: Setup },
   { id: "settings", label: "Settings", component: Settings, hidden: true },
 ];

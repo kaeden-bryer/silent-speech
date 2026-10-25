@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "design-review": "node design-review.mjs"
+    "design-review": "node design-review.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -19,6 +20,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "playwright": "^1.64.1",
     "tailwindcss": "^4.1.0",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^5.0.5"
   }
 }

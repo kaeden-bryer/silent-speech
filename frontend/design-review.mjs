@@ -9,7 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync } from "node:fs";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:5173";
-const SCREENS = ["welcome", "live", "setup", "settings"];
+const SCREENS = ["welcome", "live", "practice", "setup", "settings"];
 const VIEWPORTS = [
   { name: "phone", width: 390, height: 844 },
   { name: "desktop", width: 1440, height: 900 },
