@@ -8,6 +8,7 @@ const KEY = "settings";
 const DEFAULTS = {
   theme: "light", // "light" | "dark"
   textScale: 1, // multiplies the root font size (0.85–1.3)
+  voice: "am_michael", // Kokoro voice, see VOICES in backend/emotional_tts.py
   autoSpeak: true, // speak as soon as a confident result arrives
   confirmNumbers: true, // results containing digits wait for a tap
   captions: true,

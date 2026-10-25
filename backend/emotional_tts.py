@@ -3,6 +3,7 @@
 Input:  text     what to say
         emotion  "neutral", "energetic", "sad" or "angry" (what emotion.py returns)
         hurry    1 = normal speed; more when the voice is behind the lips (server.py decides)
+        voice    one of VOICES (picked in the app's settings), or None for VOICE
 Output: (WAV audio as bytes, its length in seconds), or (None, 0) to let the browser read the text.
 
 How: the same Kokoro-82M as tts.py (~40 ms a sentence on the GPU), but the emotion changes how it
@@ -27,7 +28,9 @@ import soundfile as sf
 import torch
 from kokoro import KPipeline
 
-VOICE = "af_heart"
+# Kokoro's best American voices (its own grades: the male ones are all C+, af_heart is A)
+VOICES = ["am_michael", "am_fenrir", "am_puck", "af_heart"]
+VOICE = "am_michael"  # the default
 SAMPLE_RATE = 24000
 # pitch: x the average pitch   moves: x how far the pitch moves around it   speed: x speaking rate
 # gain: loudness in dB         grit: >0 saturates a little (a tense, harsher voice)
@@ -70,14 +73,15 @@ def trim(audio):
     return audio[max(loud[0] - pad, 0): loud[-1] + pad]
 
 
-def text_to_speech(text: str, emotion: str, hurry: float = 1.0):
+def text_to_speech(text: str, emotion: str, hurry: float = 1.0, voice: str | None = None):
     global style
     if not text.strip():
         return None, 0
     look = STYLES.get(emotion, STYLES["neutral"])
     with gpu:
         style = look
-        chunks = [a.numpy() for _, _, a in pipeline(text, voice=VOICE, speed=look["speed"] * hurry)]
+        voice = voice if voice in VOICES else VOICE
+        chunks = [a.numpy() for _, _, a in pipeline(text, voice=voice, speed=look["speed"] * hurry)]
     audio = trim(np.concatenate(chunks)) if chunks else np.zeros(0, np.float32)
     if not len(audio):
         return None, 0
@@ -93,14 +97,22 @@ def text_to_speech(text: str, emotion: str, hurry: float = 1.0):
     return out.getvalue(), len(audio) / SAMPLE_RATE
 
 
-text_to_speech("Ready.", "neutral")  # warm-up: the first GPU run is slow
+for name in list(VOICES):  # warm-up (the first GPU run is slow), and load every voice now
+    try:
+        text_to_speech("Ready.", "neutral", voice=name)
+    except Exception as e:  # e.g. offline and never downloaded: just not offered
+        print(f"emotional_tts: voice {name} not available ({e})")
+        VOICES.remove(name)
+if VOICE not in VOICES:
+    VOICE = VOICES[0]
 
 
 if __name__ == "__main__":
     sentence = " ".join(sys.argv[1:]) or "testing from mobile"
-    for feeling in STYLES:
-        start = time.perf_counter()
-        wav, seconds = text_to_speech(sentence, feeling)
-        with open(f"{feeling}.wav", "wb") as f:
-            f.write(wav)
-        print(f"{feeling}.wav: {seconds:.2f}s of speech, made in {(time.perf_counter() - start) * 1000:.0f} ms")
+    for name in VOICES:
+        for feeling in STYLES:
+            start = time.perf_counter()
+            wav, seconds = text_to_speech(sentence, feeling, voice=name)
+            with open(f"{name}-{feeling}.wav", "wb") as f:
+                f.write(wav)
+            print(f"{name}-{feeling}.wav: {seconds:.2f}s of speech, made in {(time.perf_counter() - start) * 1000:.0f} ms")

@@ -178,7 +178,7 @@ export default function LiveCapture({ onNavigate }) {
     heldBackRef.current = false;
     holdingRef.current = true;
     setHolding(true);
-    liveRef.current.start();
+    liveRef.current.start(getSettings().voice);
     sendFrames();
   }
 
@@ -206,7 +206,7 @@ export default function LiveCapture({ onNavigate }) {
     setError(null);
     setFinishing(true);
     try {
-      const r = await api.sendText(text);
+      const r = await api.sendText(text, getSettings().voice);
       const piece = { text: r.text, audio: r.audio };
       const spoken = Boolean(r.text) && speaksByItself(r.text);
       setResult({ text: r.text, emotion: r.emotion, pieces: [piece], spoken });
