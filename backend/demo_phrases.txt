@@ -2,10 +2,7 @@ Hello, how are you?
 Nice to meet you.
 Thank you very much.
 What is your name?
-I need some help.
-Where is the bathroom?
 See you later.
-Testing
-Welcome to CalHacks!
+Testing silent speech.
+Let's win Calhacks!
 I need more caffeine.
-Let's win this squad

@@ -1,0 +1,66 @@
+--- a/backend/server.py	2026-10-24 16:19:47.344983632 -0700
++++ b/backend/server.py	2026-10-24 16:19:47.358834133 -0700
+@@ -36,6 +36,7 @@
+ 
+ 
+ lipreading = load("lipreading")
++pipeline = load("pipeline")  # Auto-AVSR -> phrase gate -> Qwen likelihood fusion (backend/pipeline.py); falls back to lipreading alone
+ correction = load("correction")
+ emotion = load("emotion")
+ tts = load("tts")
+@@ -47,11 +48,13 @@
+ 
+ RECORDINGS = Path(__file__).parent / "recordings"  # every clip is kept: test material for lip reading
+ history = []  # the conversation: [{"speaker": "me" or "them", "text": "..."}]
++clips = {}  # clip_id -> saved video path, so the emotion step can use the clip once the user confirms the text
+ call_active = False
+ 
+ 
+-def speak(raw_text, video_path=None):
+-    text = safe(lambda: correction.correct(raw_text, history), raw_text)
++def speak(raw_text, video_path=None, fix=True):
++    # fix=False: the text was confirmed or edited by the user, so it must not be changed again
++    text = safe(lambda: correction.correct(raw_text, history), raw_text) if fix else raw_text
+     feeling = safe(lambda: emotion.detect_emotion(video_path, raw_text), "neutral")
+     audio = safe(lambda: tts.text_to_speech(text, feeling), None)
+     history.append({"speaker": "me", "text": text})
+@@ -66,17 +69,34 @@
+     }
+ 
+ 
++def recognize(path):
++    """Recognition only. Nothing here speaks, stores history or talks to a phone call."""
++    result = safe(lambda: pipeline.recognize(path), None) if pipeline else None
++    if result is None:  # pipeline missing or crashed: plain Auto-AVSR, still shown for confirmation
++        raw = safe(lambda: lipreading.lip_read(path), "")
++        result = {"raw_text": raw, "final_text": raw, "method": "visual_fallback" if raw else "failed", "alternatives": [],
++                  "needs_confirmation": True, "latency_ms": 0}
++    return {k: result[k] for k in ("raw_text", "final_text", "method", "alternatives", "needs_confirmation", "latency_ms")}
++
++
+ @app.post("/api/video")
+ def from_video(video: UploadFile = File(...)):
+-    """One recorded clip = one sentence."""
++    """One recorded clip = one sentence. Returns the recognized text for the user to confirm or edit: no audio yet."""
+     RECORDINGS.mkdir(exist_ok=True)
+     suffix = ".mp4" if "mp4" in (video.content_type or "") else ".webm"
+-    path = RECORDINGS / f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 1000}{suffix}"
++    clip_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 1000}"
++    path = RECORDINGS / f"{clip_id}{suffix}"
+     path.write_bytes(video.file.read())
+-    raw_text = safe(lambda: lipreading.lip_read(str(path)), "")
+-    if not raw_text:  # nothing understood: say nothing rather than something wrong
++    clips[clip_id] = str(path)
++    return {"clip_id": clip_id, **recognize(str(path))}
++
++
++@app.post("/api/speak")
++def speak_confirmed(text: str = Body(embed=True), clip_id: str | None = Body(None, embed=True)):
++    """Called only after the user confirmed or edited the text. This is the only route that produces speech from a clip."""
++    if not text.strip():
+         return {"raw_text": "", "text": "", "emotion": "neutral", "audio": None}
+-    return speak(raw_text, str(path))
++    return speak(text, clips.get(clip_id), fix=False)
+ 
+ 
+ @app.post("/api/text")
