@@ -135,15 +135,9 @@ export default function Practice() {
               className={`absolute inset-0 size-full -scale-x-100 object-cover ${cameraOn ? "" : "hidden"}`}
             />
             {!cameraOn && (
-              <div className="absolute inset-0 grid place-items-center">
-                <button
-                  onClick={startCamera}
-                  className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-accent transition hover:bg-accent-strong"
-                >
-                  <Icon d={paths.camera} className="size-5" />
-                  Start camera
-                </button>
-              </div>
+              <p className="absolute inset-0 grid place-items-center px-8 text-center text-sm font-semibold text-white/60">
+                Tap the button below to turn the camera on
+              </p>
             )}
             {cameraOn && (
               <CameraChip>
