@@ -1,8 +1,8 @@
 # Silent Speech
 
-For people who can move their lips but can't make a sound: hold up your phone, mouth a sentence, and the phone says it out loud.
+For people who can move their lips but can't make a sound: hold up your phone, hold the button, mouth a sentence, and the phone says it out loud, word by word, while you are still mouthing.
 
-**camera → lip reading → correction → emotion → voice → speaker (or phone call)**
+**camera → live lip reading → emotion → voice → speaker (or phone call)**
 
 ## Who does what
 
@@ -12,7 +12,8 @@ Everyone works in their own file. Each file has one function that returns a fake
 |---|---|---|
 | 1. Website | `frontend/index.html` | the page: camera, recording, playing the voice |
 | 2. Lip reading | `backend/lipreading.py` | `lip_read(video_path)` → text |
-| 3. Correction | `backend/llm_correction.py` | `llm_correct(raw_text, history)` → fixed text, by a local LLM using the conversation. Runs first |
+| 2. Live lip reading | `backend/streaming.py` | `step(hold)` → the words that are sure while the user is still mouthing (uses `lipreading.py`'s model). Try it: `python streaming.py clip.webm` |
+| 3. Correction | `backend/llm_correction.py` | `llm_correct(raw_text, history)` → fixed text, by a local LLM using the conversation. **Off** (`LLM_CORRECTION` in `server.py`): it rewrites whole sentences, live mode speaks word by word |
 | 3. Correction | `backend/correction.py` | `correct(raw_text, history)` → fixed text |
 | 3. Voice | `backend/tts.py` | `text_to_speech(text, emotion)` → MP3 bytes, or `None` for the browser voice |
 | 4. Emotion | `backend/emotion.py` | `detect_emotion(video_path, text)` → `"neutral"`, `"energetic"`, `"sad"` or `"angry"` |
@@ -47,6 +48,7 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 
 | Request | Send | Get back |
 |---|---|---|
+| `WebSocket /api/live` | `{"type": "start"}`, then frames (8-byte time in ms, float64 little-endian, + one JPEG), then `{"type": "stop"}` | `{"type": "heard", "heard", "pending", "face"}` after each reading, `{"type": "say", "text", "audio"}` for each group of sure words (in order), `{"type": "done", "text", "emotion"}` |
 | `POST /api/video` | form field `video`: the recorded clip | result |
 | `POST /api/text` | `{"text": "..."}` | result |
 | `GET /api/history` | | `{"history": [{"speaker": "me" or "them", "text": "..."}], "call_active": true/false}` |

@@ -4,17 +4,20 @@ Run from backend/:  uvicorn server:app --reload --host 0.0.0.0 --port 8000
 Offline phone demo: python server.py  (HTTPS when ../certs exists, see offline-demo-instructions.md)
 
 Every sentence prints one line: what was read, what was said, and how long each step took.
+The website uses /api/live: lips are read while the button is held, and spoken word by word.
 """
 
+import asyncio
 import base64
 import importlib
+import json
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, File, Request, UploadFile
+from fastapi import Body, FastAPI, File, Request, UploadFile, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -43,14 +46,20 @@ def safe(step, fallback, timings, name):
         timings[name] = round((time.perf_counter() - start) * 1000)
 
 
+# Off: live lip reading speaks words as they come, and the LLM rewrites whole sentences.
+# True brings it back for /api/video and /api/text (it also costs ~1 min of start-up and 8 GB).
+LLM_CORRECTION = False
+
 lipreading = load("lipreading")
-llm_correction = load("llm_correction")
+streaming = load("streaming")
+llm_correction = load("llm_correction") if LLM_CORRECTION else None
 correction = load("correction")
 emotion = load("emotion")
 tts = load("tts")
 phone = load("phone")
 
-broken = [name for name in ("lipreading", "llm_correction", "correction", "emotion", "tts", "phone") if not globals()[name]]
+parts = ["lipreading", "streaming", "correction", "emotion", "tts", "phone"] + ["llm_correction"] * LLM_CORRECTION
+broken = [name for name in parts if not globals()[name]]
 print(f"Using the safe default for: {', '.join(broken)} (see the errors above)" if broken else "Every part loaded.", flush=True)
 
 app = FastAPI()
@@ -68,7 +77,9 @@ def speak(raw_text, video_path=None, timings=None):
     timings = {} if timings is None else timings
     # The face doesn't depend on the text fixes, so it is looked at while the LLM works
     feeling = meanwhile.submit(safe, lambda: emotion.detect_emotion(video_path, raw_text), "neutral", timings, "emotion")
-    fixed = safe(lambda: llm_correction.llm_correct(raw_text, history), raw_text, timings, "llm")  # the LLM fixes it
+    fixed = raw_text
+    if llm_correction:  # the LLM fixes it (off, see LLM_CORRECTION)
+        fixed = safe(lambda: llm_correction.llm_correct(raw_text, history), raw_text, timings, "llm")
     text = safe(lambda: correction.correct(fixed, history), fixed, timings, "snap")  # then snaps it to a demo phrase
     feeling = feeling.result()
     audio = safe(lambda: tts.text_to_speech(text, feeling), None, timings, "tts")
@@ -110,6 +121,106 @@ def from_text(text: str = Body(embed=True)):
     if not text.strip():
         return NOTHING
     return speak(text.strip())
+
+
+@app.websocket("/api/live")
+async def live(ws: WebSocket):
+    """Live lip reading while the button is held (streaming.py does the reading).
+    Phone -> here: {"type": "start"}, frames (8-byte time in ms + JPEG), {"type": "stop"}.
+    Here -> phone: {"type": "heard", "heard", "pending", "face"} after each reading,
+                   {"type": "say", "text", "audio"} for each group of sure words, in order,
+                   {"type": "done", "text", "emotion"} once everything is said."""
+    await ws.accept()
+    sending = asyncio.Lock()
+
+    async def send(message):
+        async with sending:
+            await ws.send_json(message)
+
+    hold = reading = None
+    try:
+        while True:
+            message = await ws.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+            if message.get("bytes"):
+                if hold and not hold["stopped"]:
+                    streaming.add_frame(hold, message["bytes"])
+            elif message.get("text"):
+                kind = json.loads(message["text"]).get("type")
+                if kind == "start" and not streaming:
+                    await send({"type": "error", "message": "Live lip reading isn't running: see the server's terminal."})
+                elif kind == "start":
+                    if reading:
+                        await reading  # the last hold is still being finished
+                    hold = streaming.start()
+                    reading = asyncio.create_task(read_live(hold, send))
+                elif kind == "stop" and hold:
+                    hold["stopped"] = True
+    finally:
+        if reading:
+            reading.cancel()  # the phone went away
+
+
+MAX_HOLD = 60  # seconds: stop reading even if the button is never released
+
+
+async def read_live(hold, send):
+    """Read while the button is held; voice the sure words as soon as they come."""
+    begin = time.perf_counter()
+    timings, said_at, reads = {}, [], []
+    feeling = None
+    voicing = None  # the last group of words being voiced: each waits for the one before, to stay in order
+
+    async def voice(words, before):
+        nonlocal feeling
+        if before:
+            await before
+        text = " ".join(words)
+        if feeling is None:  # the face, looked at once per hold, sets the tone
+            look = lambda: emotion.detect_emotion_frames(streaming.frames_so_far(hold))  # noqa: E731
+            feeling = await asyncio.to_thread(safe, look, "neutral", timings, "emotion")
+        audio = await asyncio.to_thread(safe, lambda: tts.text_to_speech(text, feeling), None, timings, "tts")
+        if call_active:  # in a thread: say() waits on this same event loop to send the audio
+            await asyncio.to_thread(safe, lambda: phone.say(text, audio), None, timings, "phone")
+        await send({"type": "say", "text": text, "audio": base64.b64encode(audio).decode() if audio else None})
+        said_at.append(f"{text!r} {time.perf_counter() - begin:.1f}s")
+
+    try:
+        while not hold["stopped"] and (not hold["times"] or hold["times"][-1] - hold["times"][0] < MAX_HOLD):
+            if not streaming.due(hold):
+                await asyncio.sleep(0.02)
+                continue
+            result = await asyncio.to_thread(safe, lambda: streaming.step(hold), None, timings, "read")
+            reads.append(timings["read"])
+            if result:
+                await send({"type": "heard", "heard": result["heard"], "pending": result["pending"], "face": result["face"]})
+                if result["say"]:
+                    voicing = asyncio.create_task(voice(result["say"], voicing))
+        released = time.perf_counter() - begin
+        words = await asyncio.to_thread(safe, lambda: streaming.finish(hold), [], timings, "last read")
+        if words:
+            voicing = asyncio.create_task(voice(words, voicing))
+        if voicing:
+            await voicing
+        text = " ".join(hold["spoken"])
+        if text:
+            history.append({"speaker": "me", "text": text})
+        await send({"type": "done", "text": text, "emotion": feeling or "neutral"})
+        last = f"last words voiced {time.perf_counter() - begin - released:.2f}s after release" if words else "nothing left at release"
+        mean = round(sum(reads) / len(reads)) if reads else None
+        print(f"live: {', '.join(said_at) or 'nothing read'} | released at {released:.1f}s, {last} | {len(reads)} readings, "
+              f"ms: read {mean} (max {max(reads, default=None)}), last read {timings.get('last read')}, tts {timings.get('tts')}", flush=True)
+        if hold["frames"]:  # keep it, like the recorded clips: test material for lip reading
+            RECORDINGS.mkdir(exist_ok=True)
+            path = RECORDINGS / f"{time.strftime('%Y%m%d-%H%M%S')}-live.mp4"
+            meanwhile.submit(safe, lambda: streaming.save(hold, path), None, {}, "save")
+    except Exception:
+        traceback.print_exc()
+        try:
+            await send({"type": "error", "message": "Something went wrong while reading: see the server's terminal."})
+        except Exception:  # the phone is gone
+            pass
 
 
 @app.get("/api/history")

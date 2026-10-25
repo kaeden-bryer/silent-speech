@@ -104,8 +104,11 @@ def guess(face):
 
 
 def votes(video_path):
+    return look_at(sample_frames(video_path))
+
+
+def look_at(frames):
     """One guess per face looked at, in the order looked at."""
-    frames = sample_frames(video_path)
     seen = []
     for i in middle_first(len(frames))[:MAX_LOOKS]:
         face = find_face(frames[i])
@@ -122,6 +125,11 @@ def detect_emotion(video_path: str | None, text: str) -> str:
         return "neutral"
     seen = votes(video_path)
     return max(GROUPS, key=seen.count)  # the most votes; no votes or a tie: neutral
+
+
+def detect_emotion_frames(frames: list) -> str:
+    """The same from RGB frames already decoded (live lip reading, streaming.py)."""
+    return max(GROUPS, key=look_at(frames[::EVERY]).count)
 
 
 find_face(np.zeros((480, 640, 3), np.uint8))  # warm-up: the first run of each is slow
