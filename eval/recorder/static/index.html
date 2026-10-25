@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silent Speech: evaluation recorder</title>
+<!-- Self-contained: no external scripts, fonts or requests. Videos go only to this page's own server. -->
+<style>
+  :root { --bg:#14161a; --card:#1e2127; --fg:#f2f3f5; --mut:#9aa1ad; --acc:#4da3ff; --ok:#3ecf8e; --bad:#ff5d5d; --warn:#ffb020; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--card); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  #bar { flex:1; min-width:140px; height:10px; background:#2e333c; border-radius:5px; overflow:hidden; }
+  #bar > div { height:100%; width:0; background:var(--ok); transition:width .2s; }
+  main { max-width:900px; margin:0 auto; padding:14px; }
+  .meta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  .badge { padding:2px 10px; border-radius:12px; background:#2e333c; font-size:13px; color:var(--mut); }
+  .badge.mode { color:#fff; font-weight:600; }
+  .badge.silent { background:#6a4bd8; } .badge.audible { background:#d8794b; } .badge.none { background:#4b6a7a; }
+  .badge.saved { background:var(--ok); color:#06210f; }
+  #sentence { font-size:clamp(26px,6vw,46px); font-weight:700; text-align:center; margin:14px 0 6px; min-height:1.3em; }
+  #instr { text-align:center; color:var(--mut); margin-bottom:12px; }
+  .stage { position:relative; background:#000; border-radius:10px; overflow:hidden; }
+  video { display:block; width:100%; max-height:62vh; background:#000; }
+  #live { transform:scaleX(-1); } /* mirrored preview only; the recording itself is not mirrored */
+  #overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+             font-size:120px; font-weight:800; color:#fff; text-shadow:0 0 20px #000; pointer-events:none; }
+  #rec { position:absolute; top:10px; left:12px; color:#fff; background:rgba(255,0,0,.8); padding:2px 10px; border-radius:12px;
+         font-weight:600; display:none; }
+  .controls { display:flex; gap:10px; margin:12px 0; flex-wrap:wrap; justify-content:center; }
+  button { font:inherit; padding:10px 18px; border-radius:8px; border:0; background:#2e333c; color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--acc); color:#04121f; font-weight:700; }
+  button.go { background:var(--ok); color:#06210f; font-weight:700; }
+  button.stop { background:var(--bad); color:#fff; font-weight:700; }
+  button:disabled { opacity:.4; cursor:default; }
+  #msg { text-align:center; min-height:1.4em; color:var(--warn); }
+  #msg.ok { color:var(--ok); }
+  details { margin-top:14px; background:var(--card); border-radius:8px; padding:8px 12px; }
+  #list { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; margin-top:8px; }
+  #list button { padding:6px; font-size:13px; text-align:left; }
+  #list button.cur { outline:2px solid var(--acc); } #list button.done { background:#1f4d38; }
+  #setup { position:fixed; inset:0; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; z-index:5; }
+  #setup input { font:inherit; padding:10px; border-radius:8px; border:1px solid #444; background:#fff; color:#000; width:220px; }
+  .hide { display:none !important; }
+  small { color:var(--mut); }
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>Silent Speech: evaluation recorder</h1>
+  <label>Speaker ID (letters, digits, - or _; e.g. spk01)<br><input id="speaker" maxlength="32" autocomplete="off"></label>
+  <label><input type="checkbox" id="countdown" checked> 3-second countdown before recording</label>
+  <button class="primary" id="start">Start</button>
+  <p id="setupmsg" style="color:var(--warn)"></p>
+  <small>Recordings are saved only on the computer running this tool. Nothing is uploaded anywhere else.</small>
+</div>
+
+<header>
+  <h1>Evaluation recorder</h1>
+  <span class="badge" id="who"></span>
+  <div id="bar"><div></div></div>
+  <span id="progress" class="badge"></span>
+</header>
+
+<main>
+  <div class="meta">
+    <span class="badge" id="clipid"></span>
+    <span class="badge" id="setname"></span>
+    <span class="badge mode" id="mode"></span>
+    <span class="badge" id="split"></span>
+    <span class="badge" id="pos"></span>
+    <span class="badge saved hide" id="savedtag">saved</span>
+  </div>
+  <div id="sentence"></div>
+  <div id="instr"></div>
+
+  <div class="stage">
+    <video id="live" autoplay muted playsinline></video>
+    <video id="review" class="hide" controls playsinline></video>
+    <div id="rec">● REC <span id="timer">0.0</span> s</div>
+    <div id="overlay"></div>
+  </div>
+
+  <div class="controls" id="ctl-record">
+    <button id="prev">← Prev</button>
+    <button class="primary" id="record">Record (Space)</button>
+    <button class="stop hide" id="stop">Stop (Space)</button>
+    <button id="next">Next →</button>
+  </div>
+  <div class="controls hide" id="ctl-review">
+    <button class="go" id="save">Save (Enter)</button>
+    <button id="retry">Retry (R)</button>
+  </div>
+  <div id="msg"></div>
+
+  <details>
+    <summary>All clips (jump to one)</summary>
+    <div id="list"></div>
+    <p><small>Camera: <select id="camera"></select></small></p>
+  </details>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const MAX_SECONDS = 10, MIN_SECONDS = 1.0;
+let items = [], saved = {}, idx = 0, speaker = "", stream = null, recorder = null, chunks = [];
+let blob = null, startedAt = 0, timerHandle = null, autoStop = null, busy = false;
+const attempts = {};
+
+function msg(text, ok) { $("msg").textContent = text; $("msg").className = ok ? "ok" : ""; }
+const cur = () => items[idx];
+const savedCount = () => items.filter(i => saved[i.clip_id]).length;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { status: r.status });
+  return body;
+}
+
+async function openCamera(deviceId) {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: deviceId ? { deviceId: { exact: deviceId } }
+                    : { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 25 } },
+    audio: false,   // the model reads video only; no microphone is requested
+  });
+  $("live").srcObject = stream;
+  const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+  const sel = $("camera");
+  sel.innerHTML = "";
+  cams.forEach((c, i) => { const o = document.createElement("option"); o.value = c.deviceId; o.textContent = c.label || `camera ${i + 1}`; sel.appendChild(o); });
+  const active = stream.getVideoTracks()[0].getSettings().deviceId;
+  if (active) sel.value = active;
+}
+
+function render() {
+  const it = cur();
+  $("clipid").textContent = it.clip_id;
+  $("setname").textContent = it.set.replace("_", "-");
+  const mode = $("mode");
+  mode.textContent = it.speech_mode === "none" ? "NO SPEECH" : it.speech_mode.toUpperCase();
+  mode.className = "badge mode " + it.speech_mode;
+  $("split").textContent = it.split;
+  $("pos").textContent = `clip ${idx + 1} of ${items.length}`;
+  $("sentence").textContent = it.text || "(say nothing)";
+  $("instr").textContent = it.instruction;
+  $("savedtag").classList.toggle("hide", !saved[it.clip_id]);
+  $("progress").textContent = `saved ${savedCount()} / ${items.length}`;
+  $("bar").firstElementChild.style.width = (100 * savedCount() / items.length) + "%";
+  $("who").textContent = speaker;
+  renderList();
+  showLive();
+}
+
+function renderList() {
+  const list = $("list");
+  list.innerHTML = "";
+  items.forEach((it, i) => {
+    const b = document.createElement("button");
+    b.textContent = (saved[it.clip_id] ? "✓ " : "") + it.clip_id;
+    b.className = (i === idx ? "cur " : "") + (saved[it.clip_id] ? "done" : "");
+    b.onclick = () => { if (!busy && !recorder) { idx = i; render(); } };
+    list.appendChild(b);
+  });
+}
+
+function showLive() {
+  blob = null;
+  $("review").classList.add("hide"); $("review").removeAttribute("src");
+  $("live").classList.remove("hide");
+  $("ctl-review").classList.add("hide"); $("ctl-record").classList.remove("hide");
+  $("record").classList.remove("hide"); $("stop").classList.add("hide");
+  $("record").textContent = saved[cur().clip_id] ? "Re-record (Space)" : "Record (Space)";
+  $("prev").disabled = idx === 0; $("next").disabled = idx === items.length - 1;
+}
+
+function pickMime() {
+  return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"].find(m => MediaRecorder.isTypeSupported(m)) || "";
+}
+
+async function beginRecording() {
+  if (recorder || busy) return;
+  busy = true;
+  if ($("countdown").checked) {
+    for (const n of [3, 2, 1]) { $("overlay").textContent = n; await new Promise(r => setTimeout(r, 1000)); }
+    $("overlay").textContent = "";
+  }
+  chunks = [];
+  const mime = pickMime();
+  recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : {});
+  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = onStopped;
+  recorder.start();
+  startedAt = performance.now();
+  $("rec").style.display = "block";
+  $("record").classList.add("hide"); $("stop").classList.remove("hide");
+  $("prev").disabled = $("next").disabled = true;
+  timerHandle = setInterval(() => { $("timer").textContent = ((performance.now() - startedAt) / 1000).toFixed(1); }, 100);
+  autoStop = setTimeout(stopRecording, MAX_SECONDS * 1000);
+  busy = false;
+  msg("Recording…");
+}
+
+function stopRecording() {
+  if (recorder && recorder.state === "recording") recorder.stop();
+}
+
+function onStopped() {
+  clearInterval(timerHandle); clearTimeout(autoStop);
+  $("rec").style.display = "none";
+  const seconds = (performance.now() - startedAt) / 1000;
+  blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+  blob.seconds = seconds;
+  recorder = null;
+  attempts[cur().clip_id] = (attempts[cur().clip_id] || 0) + 1;
+  $("live").classList.add("hide");
+  const rv = $("review");
+  rv.src = URL.createObjectURL(blob);
+  rv.classList.remove("hide");
+  rv.play().catch(() => {});
+  $("ctl-record").classList.add("hide"); $("ctl-review").classList.remove("hide");
+  msg(seconds < MIN_SECONDS ? `Only ${seconds.toFixed(1)} s: probably too short. Retry?` : `Recorded ${seconds.toFixed(1)} s. Save or retry.`);
+}
+
+async function saveClip() {
+  if (!blob || busy) return;
+  busy = true; $("save").disabled = true;
+  const it = cur();
+  const replace = saved[it.clip_id] ? "1" : "0";
+  const type = (blob.type || "video/webm").split(";")[0];
+  try {
+    const q = new URLSearchParams({ speaker, clip_id: it.clip_id, attempts: attempts[it.clip_id] || 1,
+                                    duration: blob.seconds.toFixed(2), replace });
+    const meta = await api("/api/save?" + q, { method: "POST", headers: { "Content-Type": type }, body: blob });
+    saved[it.clip_id] = meta;
+    msg(`Saved ${meta.video_path}`, true);
+    const next = items.findIndex((x, i) => i > idx && !saved[x.clip_id]);
+    const any = items.findIndex(x => !saved[x.clip_id]);
+    if (next >= 0) idx = next; else if (any >= 0) idx = any;
+    if (any < 0) msg(`All ${items.length} clips saved. The manifest is eval/dataset/${speaker}/manifest.csv`, true);
+    render();
+  } catch (e) {
+    msg("Save failed: " + e.message + (e.status === 409 ? " (reloading state)" : ""));
+    if (e.status === 409) { const p = await api("/api/plan?speaker=" + encodeURIComponent(speaker)); saved = p.saved; }
+  } finally { busy = false; $("save").disabled = false; }
+}
+
+function retry() { blob = null; showLive(); msg(""); }
+
+async function start() {
+  speaker = $("speaker").value.trim();
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(speaker)) { $("setupmsg").textContent = "Use 1-32 letters, digits, - or _."; return; }
+  try {
+    if (!navigator.mediaDevices || !window.MediaRecorder) throw new Error("This browser cannot record video here. Camera access needs https:// or localhost.");
+    await openCamera();
+    const p = await api("/api/plan?speaker=" + encodeURIComponent(speaker));
+    items = p.items; saved = p.saved;
+    localStorage.setItem("speaker", speaker);
+    const first = items.findIndex(i => !saved[i.clip_id]);
+    idx = first >= 0 ? first : 0;
+    $("setup").classList.add("hide");
+    render();
+    if (first < 0) msg("Every clip is already saved for this speaker. Pick a clip to re-record (old takes are kept).", true);
+  } catch (e) { $("setupmsg").textContent = e.message; }
+}
+
+$("start").onclick = start;
+$("record").onclick = beginRecording;
+$("stop").onclick = stopRecording;
+$("save").onclick = saveClip;
+$("retry").onclick = retry;
+$("prev").onclick = () => { if (idx > 0) { idx--; render(); msg(""); } };
+$("next").onclick = () => { if (idx < items.length - 1) { idx++; render(); msg(""); } };
+$("camera").onchange = e => openCamera(e.target.value);
+$("speaker").value = localStorage.getItem("speaker") || "";
+document.addEventListener("click", e => { if (e.target.tagName === "BUTTON") e.target.blur(); });  // so Space/Enter hit the shortcuts, not a focused button
+document.addEventListener("keyup", e => { if (e.code === "Space" && e.target.tagName !== "INPUT") e.preventDefault(); });
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || !$("setup").classList.contains("hide")) return;
+  if (e.code === "Space") { e.preventDefault(); recorder ? stopRecording() : (blob ? null : beginRecording()); }
+  else if (e.key === "Enter" && blob) saveClip();
+  else if ((e.key === "r" || e.key === "R") && blob) retry();
+  else if (e.key === "ArrowRight" && !recorder && !blob) $("next").click();
+  else if (e.key === "ArrowLeft" && !recorder && !blob) $("prev").click();
+});
+</script>
+</body>
+</html>

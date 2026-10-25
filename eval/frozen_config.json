@@ -1,0 +1,114 @@
+{
+  "strategy": {
+    "version": "phase3-1",
+    "vsr": {
+      "checkpoint": "vsr_trlrs2lrs3vox2avsp_base.pth",
+      "beam_size": 10,
+      "decoder_weight": 0.9,
+      "ctc_weight": 0.1,
+      "nbest": 10
+    },
+    "gate": {
+      "feature": "margin_per_token",
+      "threshold": 1.0,
+      "note": "best phrase minus runner-up, both scored as (0.9*decoder + 0.1*ctc) / n_tokens, in nats per token"
+    },
+    "fusion": {
+      "lm_weight": 0.5,
+      "visual_score": "0.9*decoder + 0.1*ctc, summed over tokens",
+      "dedupe": "by normalised words",
+      "max_candidates": 10,
+      "tie_break": "earlier (better visual) hypothesis"
+    },
+    "lm": {
+      "name": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "dtype": "bfloat16",
+      "prefix": "Sentence that I silently mouthed, written in lowercase without punctuation:"
+    },
+    "phrases": {
+      "file": "backend/demo_phrases.txt",
+      "count": 8,
+      "sha256_16": "ef5e8c22ccf848bd"
+    },
+    "confirmation": {
+      "auto_confirm_eligible_only_if": "method == visual_gate and normalised raw_text == normalised final_text"
+    }
+  },
+  "strategy_fingerprint": "b3b11ea05a921c8f",
+  "sources": {
+    "backend/lipreading.py": "b3a6efc72650d29c3718d2b93e956fa421df1c2cfa316ee9264b768ffd9a3b14",
+    "backend/pipeline.py": "898416dcfdbe30f3bc4e269440c791b34ce629fdea923fd3892684899d145d06",
+    "backend/lm_fusion.py": "0fb6123346f9ff918d2cf34706a4d49a4ae0e8d05ffc9c1535a89e306b7afa5f",
+    "backend/demo_phrases.txt": "e22037a32d2faa1e9da81948050dc76011c7595af55ff6916b2d2fe52b66a912",
+    "eval/vsr_metrics.py": "d691d68e448e540ab2e99ca31642747a6ee793179828aa3267a24d04c7be7383"
+  },
+  "models": {
+    "auto_avsr_checkpoint": {
+      "file": "vsr_trlrs2lrs3vox2avsp_base.pth",
+      "bytes": 1001892616,
+      "md5": "49f770f2c0d8b8d769347ee47ed1648f"
+    },
+    "face_detector": {
+      "file": "blaze_face_short_range.tflite",
+      "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f"
+    },
+    "qwen": {
+      "name": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "files": {
+        "config.json": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670",
+        "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+        "model.safetensors": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee",
+        "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "tokenizer_config.json": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+        "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    },
+    "auto_avsr_repo_commit": "182b62837773ab01052d4ac21ef1d2203ea7d267"
+  },
+  "libs": {
+    "torch": "2.14.1",
+    "torchvision": "0.29.1+cu130",
+    "torchaudio": "2.11.0+cu130",
+    "transformers": "5.20.2",
+    "mediapipe": "1.1.1",
+    "rapidfuzz": "3.14.6",
+    "sentencepiece": "0.2.2",
+    "numpy": "2.5.4",
+    "opencv-python-headless": "4.14.0.94",
+    "scikit-image": "0.26.0",
+    "accelerate": "1.15.0",
+    "safetensors": "0.8.0",
+    "tokenizers": "0.23.3"
+  },
+  "python": "3.12.3",
+  "frozen_at": "2026-10-24 16:21:46",
+  "git": {
+    "branch": "sihyeon/ml-eval",
+    "head": "1ab98814b488f3552bade8bc900789c9fb1d6c83",
+    "uncommitted_files": [
+      "M .gitignore",
+      " M backend/lipreading.py",
+      "?? backend/lm_fusion.py",
+      "?? backend/pipeline.py",
+      "?? eval/"
+    ]
+  },
+  "hardware": {
+    "gpu": "NVIDIA GB10, 580.178.04"
+  },
+  "dev_result_at_freeze": {
+    "silent_wer": 0.2804878048780488,
+    "silent_cer": 0.2153846153846154,
+    "silent_exact": "10/17",
+    "note": "17 silent dev clips of one speaker; chosen parameters were fixed before this number was computed"
+  },
+  "final_test": {
+    "manifest": "eval/dataset/spk01/manifest.csv",
+    "manifest_sha256": "49da36a8d9a105337e336e7e7ebe962b5b8315c3f25c8d00fe3c60a4e5a48432",
+    "split": "test",
+    "status": "NOT RUN",
+    "protocol": "run eval/final_test.py once; it verifies these hashes, refuses to run twice (lock file), and takes no tuning parameters"
+  }
+}
