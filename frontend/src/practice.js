@@ -24,7 +24,6 @@ export const PHRASES = [
   // phone calls
   { text: "Can you repeat that?", category: "phone calls" },
   { text: "One moment, please.", category: "phone calls" },
-  { text: "My name is Cara.", category: "phone calls" },
   { text: "I want to make an appointment.", category: "phone calls" },
   // out and about
   { text: "I need more caffeine.", category: "out & about" },
