@@ -31,11 +31,11 @@ VOICE = "af_heart"
 SAMPLE_RATE = 24000
 # pitch: x the average pitch   moves: x how far the pitch moves around it   speed: x speaking rate
 # gain: loudness in dB         grit: >0 saturates a little (a tense, harsher voice)
-STYLES = {
+STYLES = {  # strong on purpose: milder versions were not heard as different on the phone
     "neutral": dict(pitch=1.0, moves=1.0, speed=1.0, gain=0, grit=0),
-    "energetic": dict(pitch=1.18, moves=1.5, speed=1.08, gain=1, grit=0),
-    "sad": dict(pitch=0.86, moves=0.45, speed=0.86, gain=-5, grit=0),
-    "angry": dict(pitch=1.06, moves=1.8, speed=1.12, gain=3, grit=2.0),
+    "energetic": dict(pitch=1.25, moves=1.8, speed=1.12, gain=2, grit=0),  # up ~4 semitones, bouncy
+    "sad": dict(pitch=0.82, moves=0.35, speed=0.8, gain=-6, grit=0),  # down ~3.5 semitones, flat, slow, soft
+    "angry": dict(pitch=0.95, moves=2.0, speed=1.15, gain=4, grit=3.0),  # lower than happy, loud, hard, clipped
 }
 VOICED = 50  # Hz: Kokoro's pitch curve is ~0 where the sound is unvoiced
 PAD = 0.02  # seconds of silence kept at each end

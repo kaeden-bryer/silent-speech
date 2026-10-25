@@ -4,13 +4,12 @@ Input:  video_path  the same clip the lip reader gets, uncropped (None if the us
         text        the lip reader's raw text (unused for now)
 Output: "neutral", "energetic", "sad" or "angry"
 
-How: a rough guess from the face, a few frames per clip. MediaPipe's face detector (the same
-model file the lip reader uses) finds the face, and mini-XCEPTION (FER2013, 58k parameters,
-emotion.onnx, 236 KB) scores 64x64 grayscale crops on the CPU with cv2.dnn. No GPU.
-Its 7 emotions are folded into our 4, see GROUPS.
-Frames are looked at middle first (1/2, then 1/4 and 3/4, then the 1/8ths...), each one
-votes, and it stops as soon as one emotion has CONFIRM votes.
-Try a clip on its own:  python emotion.py clip.webm
+How: MediaPipe's face detector (the same model file the lip reader uses) finds the face in a few
+frames, and HSEmotion (EfficientNet-B0 trained on AffectNet's real-world photos, 16 MB ONNX,
+~10 ms a face on the CPU with cv2.dnn) scores 8 expressions. They are folded into our 4 (GROUPS),
+averaged over the frames, and a feeling other than neutral needs its SURE level on average.
+It replaced mini-XCEPTION (FER2013, 48 px grey faces), which read our angry frowns as fear or sad.
+Setup: models/MANIFEST.md.  Try a clip on its own:  python emotion.py clip.webm
 """
 
 import sys
@@ -23,18 +22,22 @@ import mediapipe as mp
 import numpy as np
 from mediapipe.tasks.python import BaseOptions, vision
 
-MODEL = Path(__file__).with_name("emotion.onnx")  # from fer2013_mini_XCEPTION.102-0.66.hdf5
-FACE_MODEL = Path(__file__).parent.parent / "models" / "blaze_face_short_range.tflite"  # see models/MANIFEST.md
-FER2013 = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]  # model output order
+MODELS = Path(__file__).parent.parent / "models"  # see models/MANIFEST.md
+MODEL = MODELS / "enet_b0_8_best_vgaf.onnx"
+FACE_MODEL = MODELS / "blaze_face_short_range.tflite"
+CLASSES = ["anger", "contempt", "disgust", "fear", "happy", "neutral", "sad", "surprise"]  # model output order
 GROUPS = {  # neutral first: it wins ties, and is the answer when no face was found
-    "neutral": ["neutral"],
-    "energetic": ["happy", "surprise"],
+    "neutral": ["neutral", "surprise"],  # surprise: the open mouth of someone mouthing words, on our clips
+    "energetic": ["happy", "contempt"],  # contempt: AffectNet's name for a lopsided smile, on our clips
     "sad": ["sad", "fear"],
-    "angry": ["angry", "disgust"],
+    "angry": ["anger", "disgust"],
 }
-CONFIRM = 3  # stop once this many frames agree
-MAX_LOOKS = 9  # never look at more frames than this, even if they keep disagreeing
-EVERY = 6  # only every 6th frame is a candidate (5 per second at 30 fps)
+# Average probability each feeling needs over the frames looked at, else neutral (from our clips: real smiles
+# score 0.5-0.9 and a mouthing face up to ~0.4; no neutral clip reached 0.2 angry, a frown reached 0.37)
+SURE = {"energetic": 0.45, "sad": 0.3, "angry": 0.25}
+LOOKS = 6  # frames looked at, spread over the clip
+SIZE = 224  # the model's input, in pixels
+MEAN, STD = np.array([0.485, 0.456, 0.406]), np.array([0.229, 0.224, 0.225])  # ImageNet's, as it was trained
 
 net = cv2.dnn.readNetFromONNX(str(MODEL))
 # Not OpenCV's Haar cascade: OpenCV 5 (which mediapipe installs) no longer ships its files.
@@ -45,100 +48,75 @@ lock = threading.Lock()  # neither cv2.dnn nor the face detector is thread-safe
 
 
 def sample_frames(video_path):
-    """Every EVERY-th frame, RGB.
+    """LOOKS frames spread over the clip, RGB.
     Chrome's .webm has no index (no seeking, no frame count), so the whole clip is decoded;
-    only the candidates are converted, which is cheap. Looking at them is the slow part."""
+    only the ones looked at are converted, which is cheap. Looking at them is the slow part."""
     cap = cv2.VideoCapture(video_path)
-    frames = []
+    kept = []
     for i in range(10**6):
         if not cap.grab():
             break
-        if i % EVERY:
-            continue
-        frames.append(cv2.cvtColor(cap.retrieve()[1], cv2.COLOR_BGR2RGB))
+        if i % 5 == 0:  # 5-6 candidates a second
+            kept.append(cap.retrieve()[1])
     cap.release()
-    return frames
-
-
-def middle_first(n):
-    """0..n-1 in the order: middle, then the middles of both halves, then of the quarters..."""
-    order, parts = [], [(0, n)]
-    while parts:
-        halves = []
-        for lo, hi in parts:
-            if lo < hi:
-                mid = (lo + hi) // 2
-                order.append(mid)
-                halves += [(lo, mid), (mid + 1, hi)]
-        parts = halves
-    return order
+    picks = np.linspace(0, len(kept) - 1, min(LOOKS, len(kept))).astype(int) if kept else []
+    return [cv2.cvtColor(kept[i], cv2.COLOR_BGR2RGB) for i in picks]
 
 
 def find_face(rgb):
-    """The biggest face as a 64x64 grayscale crop, or None."""
+    """The biggest face, cropped square to its box (as AffectNet's faces are), or None."""
     with lock:
         found = detector.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)).detections
     if not found:
         return None
     box = max(found, key=lambda f: f.bounding_box.width * f.bounding_box.height).bounding_box
-    # Framed like the Haar detector this was tuned with (measured on our clips):
-    # 15% bigger, and a sixth of its width higher, so it shows more forehead
-    size = 1.15 * box.width
-    cx, cy = box.origin_x + box.width / 2, box.origin_y + box.height / 2 - box.width / 6
-    x, y = int(max(cx - size / 2, 0)), int(max(cy - size / 2, 0))  # the box can stick out of the frame
-    face = rgb[y:int(cy + size / 2), x:int(cx + size / 2)]
-    if face.size == 0:
-        return None
-    return cv2.resize(cv2.cvtColor(face, cv2.COLOR_RGB2GRAY), (64, 64), interpolation=cv2.INTER_AREA)
+    x, y = max(box.origin_x, 0), max(box.origin_y, 0)  # the box can stick out of the frame
+    face = rgb[y:box.origin_y + box.height, x:box.origin_x + box.width]
+    return face if face.size else None
 
 
-def guess(face):
-    """One 64x64 uint8 face -> one of GROUPS."""
-    blob = (face.astype(np.float32) / 255 - 0.5) * 2  # the [-1, 1] range it was trained on
+def feel(face):
+    """One face crop -> how likely each of GROUPS is."""
+    x = (cv2.resize(face, (SIZE, SIZE), interpolation=cv2.INTER_AREA) / 255 - MEAN) / STD
     with lock:
-        net.setInput(blob[None, None])  # 1 x 1 x 64 x 64
+        net.setInput(x.transpose(2, 0, 1)[None].astype(np.float32))
         logits = net.forward().ravel()
-    p = np.exp(logits - logits.max())  # softmax here: cv2.dnn gets the model's own one wrong
-    p = dict(zip(FER2013, p / p.sum()))
-    return max(GROUPS, key=lambda g: sum(p[e] for e in GROUPS[g]))
-
-
-def votes(video_path):
-    return look_at(sample_frames(video_path))
+    p = np.exp(logits - logits.max())
+    p = dict(zip(CLASSES, p / p.sum()))
+    return {g: sum(p[c] for c in classes) for g, classes in GROUPS.items()}
 
 
 def look_at(frames):
-    """One guess per face looked at, in the order looked at."""
-    seen = []
-    for i in middle_first(len(frames))[:MAX_LOOKS]:
-        face = find_face(frames[i])
-        if face is None:
-            continue
-        seen.append(guess(face))
-        if seen.count(seen[-1]) == CONFIRM:
-            break
-    return seen
+    """The faces' average of each group, over LOOKS of the frames ({} if no face was found)."""
+    picks = np.linspace(0, len(frames) - 1, min(LOOKS, len(frames))).astype(int) if frames else []
+    seen = [feel(face) for face in (find_face(frames[i]) for i in picks) if face is not None]
+    return {g: float(np.mean([s[g] for s in seen])) for g in GROUPS} if seen else {}
+
+
+def choose(average):
+    """The strongest feeling that is SURE enough, else neutral."""
+    feelings = [g for g in SURE if average.get(g, 0) >= SURE[g]]
+    return max(feelings, key=average.get) if feelings else "neutral"
 
 
 def detect_emotion(video_path: str | None, text: str) -> str:
     if not video_path:
         return "neutral"
-    seen = votes(video_path)
-    return max(GROUPS, key=seen.count)  # the most votes; no votes or a tie: neutral
+    return choose(look_at(sample_frames(video_path)))
 
 
 def detect_emotion_frames(frames: list) -> str:
     """The same from RGB frames already decoded (live lip reading, streaming.py)."""
-    return max(GROUPS, key=look_at(frames[::EVERY]).count)
+    return choose(look_at(frames))
 
 
-find_face(np.zeros((480, 640, 3), np.uint8))  # warm-up: the first run of each is slow
-guess(np.zeros((64, 64), np.uint8))
+feel(np.zeros((SIZE, SIZE, 3), np.uint8))  # warm-up: the first run of each is slow
+find_face(np.zeros((480, 640, 3), np.uint8))
 
 
 if __name__ == "__main__":
     for clip in sys.argv[1:]:
         start = time.perf_counter()
-        seen = votes(clip)
-        feeling = max(GROUPS, key=seen.count)
-        print(f"{clip}: {feeling}, votes {seen} ({(time.perf_counter() - start) * 1000:.0f} ms)")
+        average = look_at(sample_frames(clip))
+        scores = ", ".join(f"{g} {p:.2f}" for g, p in average.items())
+        print(f"{clip}: {choose(average)} ({scores}) ({(time.perf_counter() - start) * 1000:.0f} ms)")

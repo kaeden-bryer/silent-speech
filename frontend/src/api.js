@@ -40,6 +40,8 @@ export const api = {
 //   say({text, audio})             a group of sure words to voice, in order
 //   done({text, emotion})          everything was said after the release
 //   error({message}), status(connected)
+// What the phone does with the sound is reported back, and printed in the server's terminal.
+let report = () => {};
 export function connectLive(on) {
   let ws;
   let closed = false;
@@ -57,6 +59,7 @@ export function connectLive(on) {
   }
   open();
   const send = (data) => ws.readyState === WebSocket.OPEN && (ws.send(data), true);
+  report = (message) => send(JSON.stringify({ type: "log", message }));
   return {
     ready: () => ws.readyState === WebSocket.OPEN,
     start: () => send(JSON.stringify({ type: "start" })),
@@ -90,8 +93,15 @@ export function play(result, { onEnd } = {}) {
   if (result.audio) {
     player.onended = player.onerror = () => onEnd?.();
     player.src = `data:audio/${result.audio.startsWith("UklGR") ? "wav" : "mpeg"};base64,${result.audio}`;
-    player.play().catch(() => speak(result.text, { onEnd }));
+    player.play().then(
+      () => report(`voice: <audio> element, "${result.text}"`),
+      (err) => {
+        report(`voice: <audio> refused (${err.name}), browser voice instead, "${result.text}"`);
+        speak(result.text, { onEnd });
+      },
+    );
   } else {
+    report(`voice: no audio from the server, browser voice, "${result.text}"`);
     speak(result.text, { onEnd });
   }
 }
@@ -113,7 +123,10 @@ function sound() {
 
 export function playInOrder(piece, { onEnd } = {}) {
   const ctx = sound();
-  if (!piece.audio || ctx?.state !== "running") return void playQueued(piece, { onEnd });
+  if (!piece.audio || ctx?.state !== "running") {
+    if (piece.audio) report(`voice: Web Audio ${ctx ? ctx.state : "missing"}, trying <audio>`);
+    return void playQueued(piece, { onEnd });
+  }
   decoding = decoding
     .then(() => ctx.decodeAudioData(Uint8Array.from(atob(piece.audio), (c) => c.charCodeAt(0)).buffer))
     .then((buffer) => {
@@ -124,8 +137,13 @@ export function playInOrder(piece, { onEnd } = {}) {
       const at = Math.max(ctx.currentTime + 0.005, playEnd);
       source.start(at);
       playEnd = at + buffer.duration;
+      const session = navigator.audioSession ? navigator.audioSession.type : "no audioSession API";
+      report(`voice: Web Audio (${session}), ${buffer.duration.toFixed(2)}s "${piece.text}" [${piece.emotion}]`);
     })
-    .catch(() => playQueued(piece, { onEnd }));
+    .catch((err) => {
+      report(`voice: Web Audio failed (${err}), trying <audio>`);
+      playQueued(piece, { onEnd });
+    });
 }
 
 // The <audio> way: one piece after the other, never on top of each other.
