@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Pastel multicolor palette from the team's swatches:
+     #FFCBE1 pink · #D6E5BD green · #F9E1A8 yellow · #BCD8EC blue · #DCCCEC lilac · #FFDAB4 peach.
+     Pink leads; each pastel gets a readable "deep" text tone. */
+  /* "-deep" tones are tuned to >= 4.5:1 WCAG contrast on their pastel */
+  --color-accent: #4d6cc0;
+  --color-accent-strong: #3f5bab;
+  --color-accent-soft: #e7ecf8;
+  --color-accent-tint: #b3c4f2; /* accent-colored text on dark panels */
+  --color-camera: #171e31; /* camera card surface, both themes */
+  --color-track: #8eb4ff; /* lip-tracking outline */
+  --shadow-accent: 0 4px 12px rgb(77 108 192 / 0.3); /* primary buttons & selected pills */
+
+  --color-blush: #ffcbe1;
+  --color-blush-deep: #9e2a5c;
+  --color-mint: #d6e5bd;
+  --color-mint-deep: #46652a;
+  --color-butter: #f9e1a8;
+  --color-butter-deep: #755810;
+  --color-sky: #bcd8ec;
+  --color-sky-deep: #27587f;
+  --color-lavender: #dcccec;
+  --color-lavender-deep: #5c3f8a;
+  --color-peach: #ffdab4;
+  --color-peach-deep: #7e450c;
+
+  --color-ink: #222433; /* app background, dark (slate-navy tint) */
+  --color-panel: #2c2f40; /* raised cards, dark */
+  --color-panel-2: #373b52; /* hover / inset, dark */
+  --color-line-dark: #434862;
+
+  --color-paper: #faf8f2; /* app background, light (cream) */
+  --color-card: #ffffff;
+  --color-line: #ece8de;
+
+  --color-body: #2b2735; /* primary text, light mode */
+  --color-muted: #767085; /* secondary text (lighter in dark mode, see below) */
+}
+
+/* Everything is rem-based, so scaling the root scales the whole UI.
+   --text-scale is the user's text-size setting (see src/settings.js). */
+html {
+  font-size: calc(17px * var(--text-scale, 1));
+}
+@media (min-width: 1024px) {
+  html {
+    font-size: calc(19px * var(--text-scale, 1));
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Mobile browsers: track the real visible height as toolbars collapse */
+#root {
+  height: 100dvh;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Muted text needs to be lighter on dark panels to stay readable */
+.dark {
+  --color-muted: #a49eb0;
+}
+
+/* Quick screen-change transitions (disabled by prefers-reduced-motion below) */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes screen-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.screen-enter {
+  animation: screen-in 0.2s ease-out both;
+}
+.screen-enter-right {
+  animation: screen-in-right 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* Keyboard users get a clear, consistent focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Soft pastel wash over the cream background, like the reference design */
+.app-bg {
+  background:
+    radial-gradient(50% 36% at 0% 0%, rgba(188, 216, 236, 0.52), transparent 70%),
+    radial-gradient(55% 40% at 100% 0%, rgba(255, 190, 180, 0.42), transparent 70%),
+    radial-gradient(45% 35% at 100% 100%, rgba(202, 242, 193, 0.38), transparent 70%),
+    radial-gradient(50% 40% at 0% 100%, rgba(234, 212, 255, 0.38), transparent 70%),
+    var(--color-paper);
+}
+
+.dark .app-bg {
+  background:
+    radial-gradient(55% 40% at 0% 0%, rgba(88, 120, 200, 0.14), transparent 70%),
+    radial-gradient(60% 45% at 100% 100%, rgba(220, 204, 236, 0.08), transparent 72%),
+    var(--color-ink);
+}

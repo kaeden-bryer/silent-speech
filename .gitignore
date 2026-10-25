@@ -6,3 +6,7 @@ backend/recordings/
 third_party/
 models/*
 !models/MANIFEST.md
+
+# Frontend build artifacts
+node_modules/
+frontend/dist/

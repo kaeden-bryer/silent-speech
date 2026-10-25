@@ -2,84 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Silent Speech</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- Track 1: turn this into the real app. For now it just tests the backend. -->
-  <h1>Silent Speech</h1>
-
-  <video id="camera" autoplay playsinline muted width="320"></video>
-  <p>
-    <button id="start">Start camera</button>
-    <button id="record" disabled>Record</button>
-  </p>
-
-  <form id="typing">
-    <input id="text" placeholder="…or type a sentence">
-    <button>Speak</button>
-  </form>
-
-  <p id="result"></p>
-
-  <script>
-    const $ = (id) => document.getElementById(id);
-    let stream, recorder;
-
-    $("start").onclick = async () => {
-      unlockSound();
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-        $("camera").srcObject = stream;
-        $("record").disabled = false;
-      } catch (err) {
-        $("result").textContent = "No camera: " + err.message + " (phones need HTTPS, see README)";
-      }
-    };
-
-    // Tap once to start recording, again to stop and send the clip.
-    $("record").onclick = () => {
-      if (recorder?.state === "recording") return recorder.stop();
-      const chunks = [];
-      recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        $("record").textContent = "Record";
-        const form = new FormData();
-        form.append("video", new Blob(chunks, { type: recorder.mimeType }), "clip");
-        send(fetch("/api/video", { method: "POST", body: form }));
-      };
-      recorder.start();
-      $("record").textContent = "Stop";
-    };
-
-    $("typing").onsubmit = (e) => {
-      e.preventDefault();
-      unlockSound();
-      send(fetch("/api/text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: $("text").value }),
-      }));
-    };
-
-    async function send(request) {
-      $("result").textContent = "…";
-      try {
-        const result = await (await request).json();
-        if (!result.text) return ($("result").textContent = "Didn't catch that");
-        $("result").textContent = `${result.text}  (heard: "${result.raw_text}", ${result.emotion})`;
-        if (result.audio) new Audio("data:audio/mpeg;base64," + result.audio).play();
-        else speechSynthesis.speak(new SpeechSynthesisUtterance(result.text));
-      } catch (err) {
-        $("result").textContent = "Backend error: " + err.message;
-      }
-    }
-
-    // iPhones only allow sound after a tap: say nothing once, during a tap.
-    function unlockSound() {
-      speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-    }
-  </script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

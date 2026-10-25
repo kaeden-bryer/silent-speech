@@ -14,7 +14,7 @@ Everyone works in their own file. Each file has one function that returns a fake
 | 2. Lip reading | `backend/lipreading.py` | `lip_read(video_path)` → text |
 | 3. Correction | `backend/correction.py` | `correct(raw_text, history)` → fixed text |
 | 3. Voice | `backend/tts.py` | `text_to_speech(text, emotion)` → MP3 bytes, or `None` for the browser voice |
-| 4. Emotion | `backend/emotion.py` | `detect_emotion(video_path, text)` → `"happy"`, `"sad"`… |
+| 4. Emotion | `backend/emotion.py` | `detect_emotion(video_path, text)` → `"neutral"`, `"energetic"`, `"sad"` or `"angry"` |
 | 4. Phone calls | `backend/phone.py` | `start_call`, `say`, `hang_up` |
 
 `backend/server.py` connects everything. If your function crashes, or your file doesn't even import, the server prints the error and uses a safe default instead: the raw text, `"neutral"`, the browser's voice… One broken part never breaks the demo.
@@ -50,7 +50,7 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 The result looks like this:
 
 ```json
-{"raw_text": "helo how r you", "text": "Hello, how are you?", "emotion": "happy", "audio": "<base64 MP3 or null>"}
+{"raw_text": "helo how r you", "text": "Hello, how are you?", "emotion": "energetic", "audio": "<base64 MP3 or null>"}
 ```
 
 If `audio` is `null`, read `text` aloud with the browser's own voice.
