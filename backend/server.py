@@ -55,10 +55,11 @@ streaming = load("streaming")
 llm_correction = load("llm_correction") if LLM_CORRECTION else None
 correction = load("correction")
 emotion = load("emotion")
+emotional_tts = load("emotional_tts")
 tts = load("tts")
 phone = load("phone")
 
-parts = ["lipreading", "streaming", "correction", "emotion", "tts", "phone"] + ["llm_correction"] * LLM_CORRECTION
+parts = ["lipreading", "streaming", "correction", "emotion", "emotional_tts", "tts", "phone"] + ["llm_correction"] * LLM_CORRECTION
 broken = [name for name in parts if not globals()[name]]
 print(f"Using the safe default for: {', '.join(broken)} (see the errors above)" if broken else "Every part loaded.", flush=True)
 
@@ -73,6 +74,13 @@ call_active = False
 meanwhile = ThreadPoolExecutor(4)  # steps that run next to the others instead of after them
 
 
+def voice_of(text, feeling, hurry=1.0):
+    """(audio, seconds): the emotional voice (WAV), or tts.py's (MP3, length unknown) if it isn't running."""
+    if emotional_tts:
+        return emotional_tts.text_to_speech(text, feeling, hurry)
+    return tts.text_to_speech(text, feeling), 0
+
+
 def speak(raw_text, video_path=None, timings=None):
     timings = {} if timings is None else timings
     # The face doesn't depend on the text fixes, so it is looked at while the LLM works
@@ -82,7 +90,7 @@ def speak(raw_text, video_path=None, timings=None):
         fixed = safe(lambda: llm_correction.llm_correct(raw_text, history), raw_text, timings, "llm")
     text = safe(lambda: correction.correct(fixed, history), fixed, timings, "snap")  # then snaps it to a demo phrase
     feeling = feeling.result()
-    audio = safe(lambda: tts.text_to_speech(text, feeling), None, timings, "tts")
+    audio, _ = safe(lambda: voice_of(text, feeling), (None, 0), timings, "tts")
     history.append({"speaker": "me", "text": text})
     if call_active:
         safe(lambda: phone.say(text, audio), None, timings, "phone")
@@ -92,7 +100,7 @@ def speak(raw_text, video_path=None, timings=None):
         "raw_text": raw_text,
         "text": text,
         "emotion": feeling,
-        # MP3 as base64, or None: then the website reads `text` with the browser's voice
+        # WAV (or MP3) as base64, or None: then the website reads `text` with the browser's voice
         "audio": base64.b64encode(audio).decode() if audio else None,
     }
 
@@ -163,31 +171,47 @@ async def live(ws: WebSocket):
 
 
 MAX_HOLD = 60  # seconds: stop reading even if the button is never released
+FACE_EVERY = 0.6  # seconds between two looks at the face, so the voice follows its emotion
+FACE_SECONDS = 1.6  # each look is at this many seconds of the latest video
+BEHIND = 0.3  # seconds the voice may lag behind the lips before it speaks faster (up to x1.3)
 
 
 async def read_live(hold, send):
-    """Read while the button is held; voice the sure words as soon as they come."""
+    """Read while the button is held; voice the sure words as soon as they come, in the face's emotion."""
     begin = time.perf_counter()
     timings, said_at, reads = {}, [], []
-    feeling = None
+    feeling = looking = seen = None  # the voice's emotion, the look at the face in progress, what it saw last
+    looked_at = 0.0
     voicing = None  # the last group of words being voiced: each waits for the one before, to stay in order
+    talking_until = 0.0  # when the phone will be done saying everything sent so far
+
+    def look():
+        return emotion.detect_emotion_frames(streaming.frames_so_far(hold, FACE_SECONDS))
 
     async def voice(words, before):
-        nonlocal feeling
+        nonlocal talking_until
         if before:
             await before
+        mood = feeling or (await looking if looking else "neutral")  # the first words wait for the first look
         text = " ".join(words)
-        if feeling is None:  # the face, looked at once per hold, sets the tone
-            look = lambda: emotion.detect_emotion_frames(streaming.frames_so_far(hold))  # noqa: E731
-            feeling = await asyncio.to_thread(safe, look, "neutral", timings, "emotion")
-        audio = await asyncio.to_thread(safe, lambda: tts.text_to_speech(text, feeling), None, timings, "tts")
+        hurry = min(1.3, 1 + max(0.0, talking_until - time.perf_counter() - BEHIND) * 0.5)
+        audio, seconds = await asyncio.to_thread(safe, lambda: voice_of(text, mood, hurry), (None, 0), timings, "tts")
+        talking_until = max(talking_until, time.perf_counter()) + seconds
         if call_active:
             safe(lambda: phone.say(text, audio), None, timings, "phone")
-        await send({"type": "say", "text": text, "audio": base64.b64encode(audio).decode() if audio else None})
-        said_at.append(f"{text!r} {time.perf_counter() - begin:.1f}s")
+        await send({"type": "say", "text": text, "audio": base64.b64encode(audio).decode() if audio else None, "emotion": mood})
+        said_at.append(f"{text!r} {time.perf_counter() - begin:.1f}s {mood}" + (f" x{hurry:.2f}" if hurry > 1 else ""))
 
     try:
         while not hold["stopped"] and (not hold["times"] or hold["times"][-1] - hold["times"][0] < MAX_HOLD):
+            if looking and looking.done():
+                now_seen = looking.result()
+                if feeling is None or now_seen == seen:  # a change needs two looks in a row: no flicker
+                    feeling = now_seen
+                seen, looking = now_seen, None
+            if not looking and hold["frames"] and time.perf_counter() - looked_at > FACE_EVERY:
+                looked_at = time.perf_counter()
+                looking = asyncio.create_task(asyncio.to_thread(safe, look, feeling or "neutral", timings, "emotion"))
             if not streaming.due(hold):
                 await asyncio.sleep(0.02)
                 continue
@@ -210,7 +234,8 @@ async def read_live(hold, send):
         last = f"last words voiced {time.perf_counter() - begin - released:.2f}s after release" if words else "nothing left at release"
         mean = round(sum(reads) / len(reads)) if reads else None
         print(f"live: {', '.join(said_at) or 'nothing read'} | released at {released:.1f}s, {last} | {len(reads)} readings, "
-              f"ms: read {mean} (max {max(reads, default=None)}), last read {timings.get('last read')}, tts {timings.get('tts')}", flush=True)
+              f"ms: read {mean} (max {max(reads, default=None)}), last read {timings.get('last read')}, "
+              f"tts {timings.get('tts')}, face {timings.get('emotion')}", flush=True)
         if hold["frames"]:  # keep it, like the recorded clips: test material for lip reading
             RECORDINGS.mkdir(exist_ok=True)
             path = RECORDINGS / f"{time.strftime('%Y%m%d-%H%M%S')}-live.mp4"
