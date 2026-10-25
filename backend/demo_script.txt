@@ -1,0 +1,15 @@
+Wouldn't it be amazing if non-verbal people could speak?
+That is the dream that Silent Speech brings to life.
+Silent Speech gives a voice to those who have lost theirs.
+This is live translation mode.
+Google Translate exists to bridge the gap between languages, but nothing exists to bridge the gap between disabilities.
+Mute people can communicate with sign language, but most people don't understand it.
+Now, mute people can communicate with spoken words.
+This is enabled by a machine learning pipeline.
+First, a visual speech recognition model guesses what the user is saying.
+Then, an LLM fixes the lip-reading output based on context.
+Finally, text to speech outputs what the user is saying.
+All of this runs on a server, and WebSockets send audio and video to and from the client.
+The coolest part is that this core pipeline enables much more than just streaming live translations.
+Have you considered that non-verbal people have never been able to make phone calls?
+At least not until now.

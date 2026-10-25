@@ -49,9 +49,12 @@ def safe(step, fallback, timings, name):
 # Off: live lip reading speaks words as they come, and the LLM rewrites whole sentences.
 # True brings it back for /api/video and /api/text (it also costs ~1 min of start-up and 8 GB).
 LLM_CORRECTION = False
+# On: live lip reading says the lines of demo_script.txt (script.py) when the lips clearly start one.
+DEMO_SCRIPT = True
 
 lipreading = load("lipreading")
 streaming = load("streaming")
+script = load("script") if DEMO_SCRIPT else None
 llm_correction = load("llm_correction") if LLM_CORRECTION else None
 correction = load("correction")
 emotion = load("emotion")
@@ -59,7 +62,8 @@ emotional_tts = load("emotional_tts")
 tts = load("tts")
 phone = load("phone")
 
-parts = ["lipreading", "streaming", "correction", "emotion", "emotional_tts", "tts", "phone"] + ["llm_correction"] * LLM_CORRECTION
+parts = ["lipreading", "streaming", "correction", "emotion", "emotional_tts", "tts", "phone"]
+parts += ["llm_correction"] * LLM_CORRECTION + ["script"] * DEMO_SCRIPT
 broken = [name for name in parts if not globals()[name]]
 print(f"Using the safe default for: {', '.join(broken)} (see the errors above)" if broken else "Every part loaded.", flush=True)
 
@@ -182,7 +186,8 @@ BEHIND = 0.3  # seconds the voice may lag behind the lips before it speaks faste
 async def read_live(hold, send, voice=None):
     """Read while the button is held; voice the sure words as soon as they come, in the face's emotion."""
     begin = time.perf_counter()
-    timings, said_at, reads = {}, [], []
+    timings, said_at, reads, said = {}, [], [], []
+    follow = script.start() if script else None  # the demo script line being said, if any
     feeling = looking = seen = None  # the voice's emotion, the look at the face in progress, what it saw last
     looked_at = 0.0
     voicing = None  # the last group of words being voiced: each waits for the one before, to stay in order
@@ -221,16 +226,24 @@ async def read_live(hold, send, voice=None):
             result = await asyncio.to_thread(safe, lambda: streaming.step(hold), None, timings, "read")
             reads.append(timings["read"])
             if result:
-                await send({"type": "heard", "heard": result["heard"], "pending": result["pending"], "face": result["face"]})
-                if result["say"]:
-                    voicing = asyncio.create_task(voice(result["say"], voicing))
+                words, heard, pending = result["say"], result["heard"], result["pending"]
+                if follow:
+                    words = safe(lambda: script.hear(follow, words), words, timings, "script")
+                    heard, pending = safe(lambda: script.shown(follow, pending), (heard, pending), timings, "script")
+                await send({"type": "heard", "heard": heard, "pending": pending, "face": result["face"]})
+                if words:
+                    said += words
+                    voicing = asyncio.create_task(voice(words, voicing))
         released = time.perf_counter() - begin
         words = await asyncio.to_thread(safe, lambda: streaming.finish(hold), [], timings, "last read")
+        if follow:
+            words = safe(lambda: script.finish(follow, words), words, timings, "script")
         if words:
+            said += words
             voicing = asyncio.create_task(voice(words, voicing))
         if voicing:
             await voicing
-        text = " ".join(hold["spoken"])
+        text = " ".join(said)
         if text:
             history.append({"speaker": "me", "text": text})
         await send({"type": "done", "text": text, "emotion": feeling or "neutral"})

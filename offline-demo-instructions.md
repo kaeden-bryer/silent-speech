@@ -94,6 +94,8 @@ In Safari, go to:
 
 Phrases from `backend/demo_phrases.txt` work most reliably.
 
+Live mode follows `backend/demo_script.txt`: mouth **one line per hold**. Once the first 2–3 words clearly start a line, the phone says that line's own words, and the rest of the line at the release (even if you let go early). Lines are expected in order, so rehearse the script top to bottom; anything off-script is said as read.
+
 ---
 
 ## Phone calls (these need the internet)

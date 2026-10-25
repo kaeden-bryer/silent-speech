@@ -15,6 +15,7 @@ Everyone works in their own file. Each file has one function that returns a fake
 | 2. Live lip reading | `backend/streaming.py` | `step(hold)` → the words that are sure while the user is still mouthing (uses `lipreading.py`'s model). Try it: `python streaming.py clip.webm` |
 | 3. Correction | `backend/llm_correction.py` | `llm_correct(raw_text, history)` → fixed text, by a local LLM using the conversation. **Off** (`LLM_CORRECTION` in `server.py`): it rewrites whole sentences, live mode speaks word by word |
 | 3. Correction | `backend/correction.py` | `correct(raw_text, history)` → fixed text |
+| 3. Demo script | `backend/script.py` | live mode: once the first words clearly start a line of `demo_script.txt`, that line is said instead of the raw reading (rest of it at the release). **On** (`DEMO_SCRIPT` in `server.py`). Try it: `python script.py "that is the dream that silent speed"` |
 | 3. Voice | `backend/tts.py` | `text_to_speech(text, emotion)` → MP3 bytes, or `None` for the browser voice. The fallback for the one below |
 | 3. Emotional voice | `backend/emotional_tts.py` | `text_to_speech(text, emotion, hurry)` → (WAV bytes, seconds): Kokoro in ~30 ms, with its pitch curve bent per emotion and no silence around it. Hear it: `python emotional_tts.py "hello there"` |
 | 4. Emotion | `backend/emotion.py` | `detect_emotion(video_path, text)` → `"neutral"`, `"energetic"`, `"sad"` or `"angry"` |
@@ -25,7 +26,7 @@ Everyone works in their own file. Each file has one function that returns a fake
 
 ## Run
 
-Lip reading, voice and correction run locally on the Ascent GPU. One-time setup (models, CUDA torch): [`models/MANIFEST.md`](models/MANIFEST.md). Test the lip reader alone with `python lipreading.py clip.webm`. Demo phrases live in `backend/demo_phrases.txt`.
+Lip reading, voice and correction run locally on the Ascent GPU. One-time setup (models, CUDA torch): [`models/MANIFEST.md`](models/MANIFEST.md). Test the lip reader alone with `python lipreading.py clip.webm`. Demo phrases live in `backend/demo_phrases.txt`; the live demo's script in `backend/demo_script.txt`.
 
 ```bash
 cd backend
