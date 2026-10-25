@@ -8,7 +8,7 @@ export default defineConfig({
     host: true, // reachable from phones on the same network / tunnels
     allowedHosts: true, // allow cloudflared/ngrok hostnames
     proxy: {
-      "/api": "http://localhost:8000", // backend during development
+      "/api": { target: "http://localhost:8000", ws: true }, // backend during development, live WebSocket too
     },
   },
 });
