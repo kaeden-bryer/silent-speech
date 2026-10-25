@@ -95,6 +95,32 @@ Phrases from `backend/demo_phrases.txt` work most reliably.
 
 ---
 
+## Phone calls (these need the internet)
+
+Everything above works with no internet. Calling a real phone does not: the call goes through Twilio. A team iPhone's mobile data is enough.
+
+Once, while online: put the Twilio keys in `backend/.env` (see the README).
+
+Every time:
+1. **Give the Ascent internet.** Plug a team iPhone into the Ascent with its cable and turn on **Settings → Personal Hotspot** on that iPhone (tap **Trust** if it asks). The Ascent's own **SilentSpeech** Wi-Fi keeps working; the other iPhone stays on it.
+   Check: `ping -c 3 api.twilio.com` on the Ascent gets replies.
+2. **Start the tunnel** in a second terminal on the Ascent, next to `python server.py`:
+   ```bash
+   cloudflared tunnel run
+   ```
+   Check: https://app.silent-speech.us opens the app from any phone with mobile data.
+3. **Call.** On the iPhone: tap **Call** at the bottom, type the number, tap **Call**. When they answer, mouth a sentence or tap a phrase: they hear it. What they say shows up as text on your screen.
+
+| What you see | What to do |
+|---|---|
+| "Calls aren't set up" | The `TWILIO_*` keys are missing from `backend/.env`. Add them and restart `python server.py`. |
+| "Couldn't call" with a Twilio error | No internet on the Ascent (step 1), or the number isn't allowed (trial account, or a country not enabled in Twilio). |
+| It rings, they answer, then it hangs up straight away | The tunnel isn't running (step 2), or Cloudflare is blocking Twilio: turn off Bot Fight Mode for `silent-speech.us`. |
+| They can't hear you | The terminal says `not said, nobody has answered yet`: wait until they pick up. Or it says `no audio`: the voice (Kokoro) failed to load; check the errors at startup. |
+| No captions of what they say | `stt.py` failed to load (see the errors at startup). The call still works without it. |
+
+---
+
 ## When you're done
 - Press **Ctrl+C** in the terminal running `python server.py`.
 - Turn off the hotspot:

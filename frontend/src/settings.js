@@ -1,6 +1,5 @@
 // App settings: one localStorage-backed store, readable from any component.
-// Call-channel settings (captions, openingLine, filler) persist but do nothing
-// until the call screen returns (see FEATURES.md).
+// openingLine and filler persist but do nothing yet (see FEATURES.md).
 
 import { useSyncExternalStore } from "react";
 
@@ -10,7 +9,9 @@ const DEFAULTS = {
   textScale: 1, // multiplies the root font size (0.85–1.3)
   autoSpeak: true, // speak as soon as a confident result arrives
   confirmNumbers: true, // results containing digits wait for a tap
-  captions: true,
+  captions: true, // show what the other person on a call says
+  hearMyself: false, // also play your sentences on this phone during a call
+  callNumber: "", // the last number dialed on the call screen
   openingLine: true,
   filler: false,
   phrases: [

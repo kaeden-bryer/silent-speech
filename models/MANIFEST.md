@@ -8,6 +8,7 @@ Everything runs locally on the Ascent. Fetch these while you have internet; the 
 | VSR checkpoint | `models/vsr_trlrs2lrs3vox2avsp_base.pth` | LRS3 WER 20.3 %, md5 `49f770f2c0d8b8d769347ee47ed1648f`. `gdown 1r1kx7l9sWnDOCnaFHIGvOtzuhFyFA88_ -O models/vsr_trlrs2lrs3vox2avsp_base.pth` |
 | Face detector | `models/blaze_face_short_range.tflite` | `curl -L -o models/blaze_face_short_range.tflite https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite` |
 | TTS | Hugging Face cache (`~/.cache/huggingface`) | `hexgrad/Kokoro-82M`, voice `af_heart`. Cached by the first `import tts` |
+| Call captions (Whisper) | Hugging Face cache (`~/.cache/huggingface`) | `distil-whisper/distil-small.en`. Cached by the first `import stt` (`python backend/stt.py clip.wav`). Bigger: `STT_MODEL=openai/whisper-small.en` |
 | Sentence fixer (LLM) | Hugging Face cache (`~/.cache/huggingface`) | `Qwen/Qwen3-4B-Instruct-2507`, 8 GB. Cached by the first `python backend/llm_correction.py "hello"` |
 
 ## Setup (from the repo root)
@@ -26,3 +27,4 @@ Tested with torch 2.14.1+cu130, mediapipe 1.1.1, kokoro 0.9.4.
 - mediapipe 1.x dropped `mp.solutions`, so the repo's own `detector.py` doesn't work. `lipreading.py` uses the Tasks `FaceDetector` instead (same 4 keypoints).
 - torch 2.14 tries to compile some ops with Triton, which needs `python3-dev`. Both model files set `TORCH_DISABLE_NATIVE_JIT=1` to skip that.
 - Offline: `export HF_HUB_OFFLINE=1` once Kokoro is cached.
+- Call captions use transformers' Whisper, not faster-whisper: CTranslate2 has no aarch64 CUDA build.

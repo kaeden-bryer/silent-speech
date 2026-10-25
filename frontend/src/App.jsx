@@ -4,18 +4,18 @@ import Welcome from "./screens/Welcome.jsx";
 import Setup from "./screens/Setup.jsx";
 import LiveCapture from "./screens/LiveCapture.jsx";
 import Settings from "./screens/Settings.jsx";
-// The call screen (screens/Conversation.jsx) is parked for now — kept as an
-// idea for the phone-call channel, not registered in the nav.
+import Conversation from "./screens/Conversation.jsx";
 
 const SCREENS = [
   { id: "welcome", label: "Welcome", component: Welcome },
   { id: "live", label: "Live", component: LiveCapture },
   { id: "setup", label: "Setup", component: Setup },
+  { id: "call", label: "Call", component: Conversation },
   { id: "settings", label: "Settings", component: Settings, hidden: true },
 ];
 
 export default function App() {
-  // #welcome / #live / #setup / #settings deep-link straight to a mockup
+  // #welcome / #live / #setup / #call / #settings deep-link straight to a mockup
   const [screen, setScreen] = useState(() => {
     const hash = window.location.hash.slice(1);
     return SCREENS.some((s) => s.id === hash) ? hash : "welcome";

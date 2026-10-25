@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { api, play, unlockSound } from "../api.js";
 import { getSettings, useSettings } from "../settings.js";
+import { useClipRecorder } from "../useClipRecorder.js";
 import { EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
 
 // The app's home screen, wired to the backend: mouth a sentence on camera
@@ -10,16 +11,11 @@ import { EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
 
 const CHANNELS = [
   { label: "Speaker", icon: paths.speaker, active: true },
-  { label: "Phone call", icon: paths.phone },
+  { label: "Phone call", icon: paths.phone, screen: "call" },
 ];
 
 export default function LiveCapture({ onNavigate }) {
   const [settings] = useSettings();
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const recorderRef = useRef(null);
-  const [cameraOn, setCameraOn] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -35,41 +31,15 @@ export default function LiveCapture({ onNavigate }) {
     play(r, { onEnd: () => setSpeaking(false) });
   }
 
-  // Stop the camera when leaving the screen
-  useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
-
-  async function startCamera() {
-    setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 25 } },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraOn(true);
-    } catch (err) {
-      // navigator.mediaDevices is undefined on plain http (except localhost)
-      setError(`Camera error: ${err.message}. Phones need HTTPS — see the README for tunnels.`);
-    }
-  }
+  const { videoRef, cameraOn, recording, startCamera, toggle } = useClipRecorder({
+    onClip: (clip) => send(api.sendVideo(clip)),
+    onError: setError,
+  });
 
   function toggleRecord() {
     unlockSound();
-    if (!cameraOn) return void startCamera();
-    if (recording) return void recorderRef.current?.stop();
-    const chunks = [];
-    // iPhones record at 4-9 Mbps by default: 2.5 (Chrome's default) makes the upload 2-4x smaller
-    const rec = new MediaRecorder(streamRef.current, { videoBitsPerSecond: 2_500_000 });
-    rec.ondataavailable = (e) => chunks.push(e.data);
-    rec.onstop = () => {
-      setRecording(false);
-      send(api.sendVideo(new Blob(chunks, { type: rec.mimeType })));
-    };
-    recorderRef.current = rec;
-    rec.start();
-    setResult(null);
-    setRecording(true);
+    if (cameraOn && !recording) setResult(null);
+    toggle();
   }
 
   async function send(request) {
@@ -149,6 +119,7 @@ export default function LiveCapture({ onNavigate }) {
         {CHANNELS.map((c) => (
           <button
             key={c.label}
+            onClick={() => c.screen && onNavigate(c.screen)}
             className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
               c.active
                 ? "bg-accent text-white shadow-accent"

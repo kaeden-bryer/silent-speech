@@ -16,7 +16,8 @@ Everyone works in their own file. Each file has one function that returns a fake
 | 3. Correction | `backend/correction.py` | `correct(raw_text, history)` → fixed text |
 | 3. Voice | `backend/tts.py` | `text_to_speech(text, emotion)` → MP3 bytes, or `None` for the browser voice |
 | 4. Emotion | `backend/emotion.py` | `detect_emotion(video_path, text)` → `"neutral"`, `"energetic"`, `"sad"` or `"angry"` |
-| 4. Phone calls | `backend/phone.py` | `start_call`, `say`, `hang_up` |
+| 4. Phone calls | `backend/phone.py` | `start_call`, `say`, `hang_up`, `active`: real calls through Twilio |
+| 4. Call captions | `backend/stt.py` | `transcribe(audio)` → what the other person on the call said (local Whisper) |
 
 `backend/server.py` connects everything. If your function crashes, or your file doesn't even import, the server prints the error and uses a safe default instead: the raw text, `"neutral"`, the browser's voice… One broken part never breaks the demo.
 
@@ -38,7 +39,9 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 - Packages you need go in `backend/requirements.txt`.
 - Every recorded clip is saved in `backend/recordings/`: test material for lip reading.
 
-**On your phone:** phones only allow the camera over HTTPS. Run `cloudflared tunnel --url http://localhost:8000` and open the `https://` URL it prints.
+**On your phone:** phones only allow the camera over HTTPS. With no internet, use the Ascent's own Wi-Fi and certificate: [`offline-demo-instructions.md`](offline-demo-instructions.md). With internet, run `python server.py` and `cloudflared tunnel run` on the Ascent and open https://app.silent-speech.us (our named tunnel, `~/.cloudflared/config.yml` on the Ascent).
+
+**Phone calls** need the internet and the tunnel (Twilio connects to `app.silent-speech.us`). Put `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_NUMBER` (`+15551234567`) in `backend/.env`. Use an upgraded Twilio account: a trial one can only call verified numbers and plays a "press any key" message first. Steps: the "Phone calls" section of [`offline-demo-instructions.md`](offline-demo-instructions.md).
 
 ## API (for the website)
 
@@ -49,6 +52,8 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 | `GET /api/history` | | `{"history": [{"speaker": "me" or "them", "text": "..."}], "call_active": true/false}` |
 | `POST /api/call` | `{"number": "+15551234567"}` | `{"ok": true}`, or an error if calls aren't set up |
 | `POST /api/hangup` | | `{"ok": true}` |
+
+Twilio's routes (not for the website): `wss://app.silent-speech.us/ws/twilio` carries the call audio both ways (8 kHz mu-law), and `POST /twilio/status` tells us when the call is over. `call_active` turns `false` on its own when the other person hangs up.
 
 The result looks like this:
 

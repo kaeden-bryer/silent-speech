@@ -3,8 +3,8 @@ import { Icon, paths } from "../components/ui.jsx";
 
 // Settings, wired client-side only (the backend isn't finished):
 // theme + text size apply globally, auto-speak / confirm-numbers / smoothing
-// change how the live screen behaves. Call-channel toggles persist but do
-// nothing until the call screen returns (see FEATURES.md).
+// change how the live screen behaves. Captions and hear-myself shape the call
+// screen; opening line and filler persist but do nothing yet (see FEATURES.md).
 
 function Card({ icon, iconTone, title, children }) {
   return (
@@ -150,10 +150,13 @@ export default function Settings({ onNavigate }) {
         title="Captions & calls"
       >
         <p className="-mt-2 mb-2 text-xs text-muted">
-          Saved now, used once phone calls land (see FEATURES.md).
+          Opening line and filler are saved but not played into calls yet.
         </p>
         <Row label="Live captions" detail="Show what the other person says">
           <Toggle on={settings.captions} onChange={(captions) => update({ captions })} />
+        </Row>
+        <Row label="Hear myself" detail="Also play your sentences on this phone during a call">
+          <Toggle on={settings.hearMyself} onChange={(hearMyself) => update({ hearMyself })} />
         </Row>
         <Row label="Opening line" detail='"Hi — I speak through an app, one moment"'>
           <Toggle on={settings.openingLine} onChange={(openingLine) => update({ openingLine })} />

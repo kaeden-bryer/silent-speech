@@ -10,4 +10,7 @@ scikit-image
 kokoro
 soundfile
 rapidfuzz
-transformers  # llm_correction.py (kokoro installs it already)
+transformers  # llm_correction.py, stt.py (kokoro installs it already)
+# Phone calls (phone.py)
+twilio
+scipy  # resampling call audio (scikit-image installs it already)

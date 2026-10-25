@@ -15,14 +15,14 @@ Priorities follow the brief: **Must** = demo fails without it · **Should** = ma
 | Stock voice fallback | Should | Mentioned in Setup copy | A default TTS voice when no clone exists (Kokoro already does this once wired) |
 | Phrase bank (one tap, never misread) | Should | Static chips in Setup + Settings | Store per-user phrases; speak them without the lip-reading path |
 | Live partial transcript while mouthing | Nice | "Reading…" overlay exists | Streaming recognition (current API is per-clip); CLAUDE.md's WebSocket design is the natural fit |
-| Call settings that do something | Should | Persisted toggles: live captions, opening line, hold-on filler | Opening line / filler = canned audio into calls; captions = transcription of the other side |
+| Call settings that do something | Should | Live captions and hear-myself work; opening line and hold-on filler are persisted toggles only | Opening line / filler = canned audio sent into the call by `phone.py` when it's answered / while the user mouths |
 
-## Parked in the frontend (built, hidden from nav)
+## Phone calls (built, needs the internet)
 
-**The phone-call channel** — `frontend/src/screens/Conversation.jsx`, a complete mockup kept as an idea: sessions sidebar, live captions of the other person as chat turns, emotion + "✓ confirmed" chips, quick-phrase row, speaker-mode toggle, hang-up. Re-add it to `SCREENS` in `App.jsx` to bring it back. Needs: Twilio Media Streams in `backend/phone.py` (dial out, play TTS into the call, transcribe the other side into history), plus history polling. The API routes (`/api/call`, `/api/hangup`, `/api/history`) already exist as placeholders.
+**The phone-call channel** is wired: the Call screen (`frontend/src/screens/Conversation.jsx`) dials a real number through Twilio Media Streams (`backend/phone.py`). Mouthed, typed or quick-phrase sentences are spoken into the call with Kokoro, and the other side is transcribed locally (`backend/stt.py`, Whisper) into history as live captions. It needs internet on the Ascent plus the `app.silent-speech.us` tunnel; everything else stays offline. The old mockup's sessions sidebar, emotion / "✓ confirmed" chips and speaker-mode toggle were dropped. Bring them back if there's time.
 
 Related call features from the brief, not started:
-- Live captions of the other caller (ElevenLabs Scribe / Deepgram) — Should
+- Fully offline calls (no Twilio): a LAN call to a second phone on the SilentSpeech Wi-Fi. Keep `start_call/say/hang_up` as the seam — Nice
 - Suggested replies from what was just said (Claude, tidy-only guardrails) — Should
 - Opening line + hold-on filler during pauses (callers hang up on silence) — Should
 - Phone menu helper ("press 1 for…") — Nice
@@ -47,5 +47,5 @@ Related call features from the brief, not started:
 ## Dropped / consciously deferred
 
 - **Health/pipeline status panel** — the old backend had `/api/health`; the new flat backend doesn't. Re-add only if module fallbacks confuse demo watchers.
-- **Session management UI** (multiple conversations) — lives in the parked call screen; the backend keeps one global history for now.
+- **Session management UI** (multiple conversations) — the old call mockup had a sidebar for it; the backend keeps one global history for now (the Call screen shows only the current call).
 - **Fake confidence percentages** — removed from the wired UI; bring back real ones when the model provides them.

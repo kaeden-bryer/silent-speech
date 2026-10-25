@@ -114,6 +114,9 @@ def from_text(text: str = Body(embed=True)):
 
 @app.get("/api/history")
 def get_history():
+    global call_active
+    if call_active and not safe(lambda: phone.active(), True, {}, "phone"):
+        call_active = False  # the other person hung up (or never answered)
     return {"history": history, "call_active": call_active}
 
 
