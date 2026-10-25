@@ -70,7 +70,7 @@
         const result = await (await request).json();
         if (!result.text) return ($("result").textContent = "Didn't catch that");
         $("result").textContent = `${result.text}  (heard: "${result.raw_text}", ${result.emotion})`;
-        if (result.audio) new Audio("data:audio/mpeg;base64," + result.audio).play();
+        if (result.audio) new Audio(`data:audio/${result.audio.startsWith("UklGR") ? "wav" : "mpeg"};base64,${result.audio}`).play();
         else speechSynthesis.speak(new SpeechSynthesisUtterance(result.text));
       } catch (err) {
         $("result").textContent = "Backend error: " + err.message;

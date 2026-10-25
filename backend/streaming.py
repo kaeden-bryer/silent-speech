@@ -184,9 +184,10 @@ def finish(hold):
     return rest
 
 
-def frames_so_far(hold):
-    """Every frame of the hold, at 25 fps (RGB): for emotion.py and for saving the clip."""
-    return window(hold, first=0)[0]
+def frames_so_far(hold, seconds=None):
+    """The hold's frames, at 25 fps (RGB): all of them, or the last `seconds` (for emotion.py)."""
+    first = 0 if seconds is None or not hold["times"] else bisect_left(hold["times"], hold["times"][-1] - seconds)
+    return window(hold, first=first)[0]
 
 
 def save(hold, path):

@@ -84,21 +84,53 @@ const player = new Audio();
 const SILENCE = "data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA";
 let unlocked = false;
 
-// result.audio is base64 MP3, or null -> speak result.text with the browser voice.
+// result.audio is base64 WAV (or MP3), or null -> speak result.text with the browser voice.
 // onEnd fires when playback finishes (or immediately if nothing can play).
 export function play(result, { onEnd } = {}) {
   if (result.audio) {
     player.onended = player.onerror = () => onEnd?.();
-    player.src = "data:audio/mpeg;base64," + result.audio;
+    player.src = `data:audio/${result.audio.startsWith("UklGR") ? "wav" : "mpeg"};base64,${result.audio}`;
     player.play().catch(() => speak(result.text, { onEnd }));
   } else {
     speak(result.text, { onEnd });
   }
 }
 
-// Groups of words arrive one after another: voice them in order, never on top of each other.
+// Groups of words arrive one after another. With Web Audio each one is set to start the
+// moment the one before ends: no gap, no start-up delay. The <audio> player is the fallback.
+let context = null;
+let playEnd = 0; // when the last piece set to play ends (Web Audio time)
+let decoding = Promise.resolve(); // keeps the pieces in order while they are decoded
+
+function sound() {
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!context && Context) {
+    context = new Context();
+    if (navigator.audioSession) navigator.audioSession.type = "playback"; // iPhones: play even on silent
+  }
+  return context;
+}
+
+export function playInOrder(piece, { onEnd } = {}) {
+  const ctx = sound();
+  if (!piece.audio || ctx?.state !== "running") return void playQueued(piece, { onEnd });
+  decoding = decoding
+    .then(() => ctx.decodeAudioData(Uint8Array.from(atob(piece.audio), (c) => c.charCodeAt(0)).buffer))
+    .then((buffer) => {
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.onended = () => onEnd?.();
+      const at = Math.max(ctx.currentTime + 0.005, playEnd);
+      source.start(at);
+      playEnd = at + buffer.duration;
+    })
+    .catch(() => playQueued(piece, { onEnd }));
+}
+
+// The <audio> way: one piece after the other, never on top of each other.
 let queue = Promise.resolve();
-export function playInOrder(piece, { onStart, onEnd } = {}) {
+function playQueued(piece, { onEnd } = {}) {
   queue = queue.then(
     () =>
       new Promise((done) => {
@@ -112,7 +144,6 @@ export function playInOrder(piece, { onStart, onEnd } = {}) {
           done();
         };
         timer = setTimeout(finish, 15_000); // one piece that never ends must not block the rest
-        onStart?.();
         play(piece, { onEnd: finish });
       }),
   );
@@ -129,6 +160,14 @@ export function speak(text, { onEnd } = {}) {
 // Only a finger lifted (or a click) counts as a tap there: one touching down does not.
 export function unlockSound() {
   speak("");
+  const ctx = sound();
+  if (ctx && ctx.state !== "running") {
+    ctx.resume();
+    const blank = ctx.createBufferSource(); // a sound started during the tap is what unlocks it
+    blank.buffer = ctx.createBuffer(1, 1, 22050);
+    blank.connect(ctx.destination);
+    blank.start();
+  }
   if (unlocked || !player.paused) return; // once is enough, and doing it again would cut off a sentence
   player.src = SILENCE;
   player.play().then(() => (unlocked = true), () => {}); // refused outside a tap: try again at the next one

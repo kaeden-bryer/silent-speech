@@ -35,6 +35,7 @@ export default function LiveCapture({ onNavigate }) {
   const [holding, setHolding] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [heard, setHeard] = useState(null); // {heard, pending, face} while reading
+  const [mood, setMood] = useState(null); // the emotion the voice is using right now
   const [result, setResult] = useState(null); // {text, emotion, pieces, spoken} once said
   const [error, setError] = useState(null);
   const [typing, setTyping] = useState(false);
@@ -67,6 +68,7 @@ export default function LiveCapture({ onNavigate }) {
       heard: setHeard,
       say(piece) {
         piecesRef.current.push(piece);
+        setMood(piece.emotion);
         if (speaksByItself(piece.text)) voice(piece);
         else heldBackRef.current = true;
       },
@@ -171,6 +173,7 @@ export default function LiveCapture({ onNavigate }) {
     setResult(null);
     setTyping(false);
     setHeard({ heard: "", pending: "", face: true });
+    setMood(null);
     piecesRef.current = [];
     heldBackRef.current = false;
     holdingRef.current = true;
@@ -333,6 +336,7 @@ export default function LiveCapture({ onNavigate }) {
                 {live ? "Reading…" : result?.spoken ? "What you said" : "Did you say…"}
               </span>
               <span className="flex items-center gap-1.5">
+                {live && mood && mood !== "neutral" && <EmotionChip emotion={mood} />}
                 {!live && result?.emotion && result.emotion !== "neutral" && <EmotionChip emotion={result.emotion} />}
                 {!live && result?.text && !result.spoken && settings.confirmNumbers && /\d/.test(result.text) && (
                   <span className="rounded-full bg-butter px-2 py-0.5 text-[11px] font-bold text-butter-deep dark:bg-butter-deep/25 dark:text-butter">
