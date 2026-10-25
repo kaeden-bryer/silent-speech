@@ -8,6 +8,7 @@ Everything runs locally on the Ascent. Fetch these while you have internet; the 
 | VSR checkpoint | `models/vsr_trlrs2lrs3vox2avsp_base.pth` | LRS3 WER 20.3 %, md5 `49f770f2c0d8b8d769347ee47ed1648f`. `gdown 1r1kx7l9sWnDOCnaFHIGvOtzuhFyFA88_ -O models/vsr_trlrs2lrs3vox2avsp_base.pth` |
 | Face detector | `models/blaze_face_short_range.tflite` | `curl -L -o models/blaze_face_short_range.tflite https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite` |
 | TTS | Hugging Face cache (`~/.cache/huggingface`) | `hexgrad/Kokoro-82M`, voice `af_heart`. Cached by the first `import tts` |
+| Facial expression (emotion.py) | `models/enet_b0_8_best_vgaf.onnx` | HSEmotion EfficientNet-B0, AffectNet 8 classes, 16 MB, sha256 `fa07e841fd06c7a6…`. `curl -L -o models/enet_b0_8_best_vgaf.onnx https://github.com/HSE-asavchenko/face-emotion-recognition/raw/main/models/affectnet_emotions/onnx/enet_b0_8_best_vgaf.onnx` |
 | Sentence fixer (LLM) | Hugging Face cache (`~/.cache/huggingface`) | `Qwen/Qwen3-4B-Instruct-2507`, 8 GB. Cached by the first `python backend/llm_correction.py "hello"` |
 
 ## Setup (from the repo root)

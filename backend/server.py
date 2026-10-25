@@ -155,8 +155,11 @@ async def live(ws: WebSocket):
                 if hold and not hold["stopped"]:
                     streaming.add_frame(hold, message["bytes"])
             elif message.get("text"):
-                kind = json.loads(message["text"]).get("type")
-                if kind == "start" and not streaming:
+                data = json.loads(message["text"])
+                kind = data.get("type")
+                if kind == "log":  # what the phone did with the sound, for debugging
+                    print(f"phone: {str(data.get('message'))[:200]}", flush=True)
+                elif kind == "start" and not streaming:
                     await send({"type": "error", "message": "Live lip reading isn't running: see the server's terminal."})
                 elif kind == "start":
                     if reading:
