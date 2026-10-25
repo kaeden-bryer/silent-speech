@@ -3,12 +3,14 @@ import { useSettings } from "./settings.js";
 import Welcome from "./screens/Welcome.jsx";
 import Setup from "./screens/Setup.jsx";
 import LiveCapture from "./screens/LiveCapture.jsx";
+import Practice from "./screens/Practice.jsx";
 import Settings from "./screens/Settings.jsx";
 import Conversation from "./screens/Conversation.jsx";
 
 const SCREENS = [
   { id: "welcome", label: "Welcome", component: Welcome },
   { id: "live", label: "Live", component: LiveCapture },
+  { id: "practice", label: "Practice", component: Practice },
   { id: "setup", label: "Setup", component: Setup },
   { id: "call", label: "Call", component: Conversation },
   { id: "settings", label: "Settings", component: Settings, hidden: true },

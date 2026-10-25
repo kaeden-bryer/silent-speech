@@ -75,6 +75,20 @@ body {
   --color-muted: #a49eb0;
 }
 
+/* Gentle ~1/s opacity pulse for status dots (disabled by reduced-motion below) */
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pulse-1s {
+  animation: dot-pulse 1s ease-in-out infinite;
+}
+
 /* Quick screen-change transitions (disabled by prefers-reduced-motion below) */
 @keyframes screen-in {
   from {
