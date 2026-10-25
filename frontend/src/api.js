@@ -25,7 +25,7 @@ export const api = {
   },
 
   // Typed text, used as if the lip reader had read it
-  sendText: (text) => request("/api/text", json({ text })),
+  sendText: (text, voice) => request("/api/text", json({ text, voice })),
 
   // -> { history: [{speaker: "me" | "them", text}], call_active }
   history: () => request("/api/history"),
@@ -62,7 +62,7 @@ export function connectLive(on) {
   report = (message) => send(JSON.stringify({ type: "log", message }));
   return {
     ready: () => ws.readyState === WebSocket.OPEN,
-    start: () => send(JSON.stringify({ type: "start" })),
+    start: (voice) => send(JSON.stringify({ type: "start", voice })),
     stop: () => send(JSON.stringify({ type: "stop" })),
     // One camera frame: when it was shot (ms) + the JPEG. Skipped when the network falls
     // behind: a late frame is worth less than a missing one.

@@ -49,9 +49,9 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 
 | Request | Send | Get back |
 |---|---|---|
-| `WebSocket /api/live` | `{"type": "start"}`, then frames (8-byte time in ms, float64 little-endian, + one JPEG), then `{"type": "stop"}` | `{"type": "heard", "heard", "pending", "face"}` after each reading, `{"type": "say", "text", "audio", "emotion"}` for each group of sure words (in order; the emotion follows the face), `{"type": "done", "text", "emotion"}` |
+| `WebSocket /api/live` | `{"type": "start", "voice": "am_michael"}`, then frames (8-byte time in ms, float64 little-endian, + one JPEG), then `{"type": "stop"}` | `{"type": "heard", "heard", "pending", "face"}` after each reading, `{"type": "say", "text", "audio", "emotion"}` for each group of sure words (in order; the emotion follows the face), `{"type": "done", "text", "emotion"}` |
 | `POST /api/video` | form field `video`: the recorded clip | result |
-| `POST /api/text` | `{"text": "..."}` | result |
+| `POST /api/text` | `{"text": "...", "voice": "am_michael"}` (voice optional) | result |
 | `GET /api/history` | | `{"history": [{"speaker": "me" or "them", "text": "..."}], "call_active": true/false}` |
 | `POST /api/call` | `{"number": "+15551234567"}` | `{"ok": true}`, or an error if calls aren't set up |
 | `POST /api/hangup` | | `{"ok": true}` |

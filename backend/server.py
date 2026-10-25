@@ -74,14 +74,14 @@ call_active = False
 meanwhile = ThreadPoolExecutor(4)  # steps that run next to the others instead of after them
 
 
-def voice_of(text, feeling, hurry=1.0):
+def voice_of(text, feeling, hurry=1.0, voice=None):
     """(audio, seconds): the emotional voice (WAV), or tts.py's (MP3, length unknown) if it isn't running."""
     if emotional_tts:
-        return emotional_tts.text_to_speech(text, feeling, hurry)
+        return emotional_tts.text_to_speech(text, feeling, hurry, voice)
     return tts.text_to_speech(text, feeling), 0
 
 
-def speak(raw_text, video_path=None, timings=None):
+def speak(raw_text, video_path=None, timings=None, voice=None):
     timings = {} if timings is None else timings
     # The face doesn't depend on the text fixes, so it is looked at while the LLM works
     feeling = meanwhile.submit(safe, lambda: emotion.detect_emotion(video_path, raw_text), "neutral", timings, "emotion")
@@ -90,7 +90,7 @@ def speak(raw_text, video_path=None, timings=None):
         fixed = safe(lambda: llm_correction.llm_correct(raw_text, history), raw_text, timings, "llm")
     text = safe(lambda: correction.correct(fixed, history), fixed, timings, "snap")  # then snaps it to a demo phrase
     feeling = feeling.result()
-    audio, _ = safe(lambda: voice_of(text, feeling), (None, 0), timings, "tts")
+    audio, _ = safe(lambda: voice_of(text, feeling, voice=voice), (None, 0), timings, "tts")
     history.append({"speaker": "me", "text": text})
     if call_active:
         safe(lambda: phone.say(text, audio), None, timings, "phone")
@@ -124,17 +124,17 @@ def from_video(video: UploadFile = File(...)):
 
 
 @app.post("/api/text")
-def from_text(text: str = Body(embed=True)):
+def from_text(text: str = Body(embed=True), voice: str | None = Body(None, embed=True)):
     """Typed text, used as if the lip reader had read it. Lets you test without the camera."""
     if not text.strip():
         return NOTHING
-    return speak(text.strip())
+    return speak(text.strip(), voice=voice)
 
 
 @app.websocket("/api/live")
 async def live(ws: WebSocket):
     """Live lip reading while the button is held (streaming.py does the reading).
-    Phone -> here: {"type": "start"}, frames (8-byte time in ms + JPEG), {"type": "stop"}.
+    Phone -> here: {"type": "start", "voice"}, frames (8-byte time in ms + JPEG), {"type": "stop"}.
     Here -> phone: {"type": "heard", "heard", "pending", "face"} after each reading,
                    {"type": "say", "text", "audio"} for each group of sure words, in order,
                    {"type": "done", "text", "emotion"} once everything is said."""
@@ -165,7 +165,7 @@ async def live(ws: WebSocket):
                     if reading:
                         await reading  # the last hold is still being finished
                     hold = streaming.start()
-                    reading = asyncio.create_task(read_live(hold, send))
+                    reading = asyncio.create_task(read_live(hold, send, data.get("voice")))
                 elif kind == "stop" and hold:
                     hold["stopped"] = True
     finally:
@@ -179,7 +179,7 @@ FACE_SECONDS = 1.6  # each look is at this many seconds of the latest video
 BEHIND = 0.3  # seconds the voice may lag behind the lips before it speaks faster (up to x1.3)
 
 
-async def read_live(hold, send):
+async def read_live(hold, send, voice=None):
     """Read while the button is held; voice the sure words as soon as they come, in the face's emotion."""
     begin = time.perf_counter()
     timings, said_at, reads = {}, [], []
@@ -198,7 +198,7 @@ async def read_live(hold, send):
         mood = feeling or (await looking if looking else "neutral")  # the first words wait for the first look
         text = " ".join(words)
         hurry = min(1.3, 1 + max(0.0, talking_until - time.perf_counter() - BEHIND) * 0.5)
-        audio, seconds = await asyncio.to_thread(safe, lambda: voice_of(text, mood, hurry), (None, 0), timings, "tts")
+        audio, seconds = await asyncio.to_thread(safe, lambda: voice_of(text, mood, hurry, voice), (None, 0), timings, "tts")
         talking_until = max(talking_until, time.perf_counter()) + seconds
         if call_active:  # in a thread: say() waits on this same event loop to send the audio
             await asyncio.to_thread(safe, lambda: phone.say(text, audio), None, timings, "phone")

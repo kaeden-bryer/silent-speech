@@ -6,6 +6,14 @@ import { Icon, paths } from "../components/ui.jsx";
 // change how the live screen behaves. Captions and hear-myself shape the call
 // screen; opening line and filler persist but do nothing yet (see FEATURES.md).
 
+// Kokoro voices the Ascent has (VOICES in backend/emotional_tts.py)
+const VOICES = [
+  { value: "am_michael", label: "Michael (male)" },
+  { value: "am_fenrir", label: "Fenrir (male)" },
+  { value: "am_puck", label: "Puck (male)" },
+  { value: "af_heart", label: "Heart (female)" },
+];
+
 function Card({ icon, iconTone, title, children }) {
   return (
     <section className="mt-4 rounded-3xl border border-line bg-card p-5 shadow-sm shadow-black/5 first:mt-0 dark:border-line-dark dark:bg-panel">
@@ -135,6 +143,20 @@ export default function Settings({ onNavigate }) {
           >
             Change
           </button>
+        </Row>
+        <Row label="Voice" detail="How you sound: changes with your face's emotion">
+          <select
+            value={settings.voice}
+            onChange={(e) => update({ voice: e.target.value })}
+            aria-label="Voice"
+            className="shrink-0 rounded-full border border-line bg-transparent px-3.5 py-1.5 text-sm font-semibold outline-none focus:border-accent dark:border-line-dark"
+          >
+            {VOICES.map((v) => (
+              <option key={v.value} value={v.value}>
+                {v.label}
+              </option>
+            ))}
+          </select>
         </Row>
         <Row label="Auto-speak" detail="Speak right away when a result arrives">
           <Toggle on={settings.autoSpeak} onChange={(autoSpeak) => update({ autoSpeak })} />
