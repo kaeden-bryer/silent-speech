@@ -1,19 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import { api, connectLive, playInOrder, unlockSound } from "../api.js";
+import { useRef, useState } from "react";
+import { api, playInOrder, unlockSound } from "../api.js";
 import { getSettings, useSettings } from "../settings.js";
+import { useLiveReader } from "../useLiveReader.js";
 import { EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
 
 // The app's home screen, wired to the backend: hold the button and mouth a sentence.
-// The lips are read live on the Ascent (backend/streaming.py) and each group of words is
-// spoken as soon as it is sure, while you are still mouthing. Release to stop.
+// The lips are read live on the Ascent (backend/streaming.py, through useLiveReader) and each
+// group of words is spoken as soon as it is sure, while you are still mouthing. Release to stop.
 // Typing a sentence works too.
 
 const CHANNELS = [
   { label: "Speaker", icon: paths.speaker, active: true },
   { label: "Phone call", icon: paths.phone, screen: "call" },
 ];
-const FRAME_MS = 40; // 25 frames a second, like the lip reader was trained on
-const JPEG_QUALITY = 0.85; // lower and the lip reader reads clearly worse (measured on our clips)
 
 // Speak right away, unless the settings say to wait for a tap
 function speaksByItself(text) {
@@ -23,23 +22,13 @@ function speaksByItself(text) {
 
 export default function LiveCapture({ onNavigate }) {
   const [settings] = useSettings();
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const liveRef = useRef(null);
-  const holdingRef = useRef(false);
   const piecesRef = useRef([]); // what the server voiced during this hold
   const heldBackRef = useRef(false); // a piece waited for a tap instead of playing
-  const waitRef = useRef(null);
-  const [cameraOn, setCameraOn] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [holding, setHolding] = useState(false);
-  const [finishing, setFinishing] = useState(false);
-  const [heard, setHeard] = useState(null); // {heard, pending, face} while reading
-  const [mood, setMood] = useState(null); // the emotion the voice is using right now
   const [result, setResult] = useState(null); // {text, emotion, pieces, spoken} once said
   const [error, setError] = useState(null);
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
+  const [sending, setSending] = useState(false); // a typed sentence is on its way
   const [speaking, setSpeaking] = useState(0); // pieces playing or waiting to
 
   function voice(piece) {
@@ -47,154 +36,24 @@ export default function LiveCapture({ onNavigate }) {
     playInOrder(piece, { onEnd: () => setSpeaking((n) => n - 1) });
   }
 
-  function finished() {
-    clearTimeout(waitRef.current);
-    waitRef.current = null;
-    setFinishing(false);
-  }
-
-  // One live connection while this screen is open
-  useEffect(() => {
-    const live = connectLive({
-      status(open) {
-        setConnected(open);
-        if (!open && (holdingRef.current || waitRef.current)) {
-          holdingRef.current = false;
-          setHolding(false);
-          finished();
-          setError("Lost the connection to the Ascent. Check the Wi-Fi, then try again.");
-        }
-      },
-      heard: setHeard,
-      say(piece) {
-        piecesRef.current.push(piece);
-        setMood(piece.emotion);
-        if (speaksByItself(piece.text)) voice(piece);
-        else heldBackRef.current = true;
-      },
-      done({ text, emotion }) {
-        finished();
-        setHeard(null);
-        setResult({ text, emotion, pieces: piecesRef.current, spoken: !heldBackRef.current });
-        if (!text) setError("Didn't catch that. Hold the button while you mouth, with your face in view.");
-      },
-      error({ message }) {
-        finished();
-        setError(message);
-      },
-    });
-    liveRef.current = live;
-    return () => live.close();
-  }, []);
-
-  // Stop the camera when leaving the screen
-  useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
-
-  // Space bar = the button (laptops); switching away from the page releases it
-  useEffect(() => {
-    const inField = (e) => /INPUT|TEXTAREA/.test(e.target.tagName);
-    const down = (e) => {
-      if (e.code !== "Space" || inField(e)) return;
-      e.preventDefault();
-      if (!e.repeat) press();
-    };
-    const up = (e) => {
-      if (e.code !== "Space" || inField(e)) return;
-      e.preventDefault();
-      release();
-    };
-    const hidden = () => document.hidden && release();
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    document.addEventListener("visibilitychange", hidden);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      document.removeEventListener("visibilitychange", hidden);
-    };
+  const { videoRef, cameraOn, connected, holding, finishing, heard, mood, startCamera, holdButton } = useLiveReader({
+    onStart() {
+      setResult(null);
+      setTyping(false);
+      piecesRef.current = [];
+      heldBackRef.current = false;
+    },
+    onSay(piece) {
+      piecesRef.current.push(piece);
+      if (speaksByItself(piece.text)) voice(piece);
+      else heldBackRef.current = true;
+    },
+    onDone({ text, emotion }) {
+      setResult({ text, emotion, pieces: piecesRef.current, spoken: !heldBackRef.current });
+      if (!text) setError("Didn't catch that. Hold the button while you mouth, with your face in view.");
+    },
+    onError: setError,
   });
-
-  async function startCamera() {
-    setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 25 } },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraOn(true);
-    } catch (err) {
-      // navigator.mediaDevices is undefined on plain http (except localhost)
-      setError(`Camera error: ${err.message}. Phones need HTTPS — see the README for tunnels.`);
-    }
-  }
-
-  // While the button is held: ~25 JPEG frames a second to the Ascent
-  function sendFrames() {
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    let next = 0;
-    let encoding = false;
-    const later = (fn) => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(fn) : setTimeout(fn, 15));
-    const grab = () => {
-      if (!holdingRef.current) return;
-      later(grab);
-      const now = performance.now();
-      if (now + 5 < next || encoding || !video.videoWidth) return; // too early, or the last one isn't sent yet
-      next = Math.max(next + FRAME_MS, now);
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      }
-      context.drawImage(video, 0, 0);
-      encoding = true;
-      canvas.toBlob(
-        async (jpeg) => {
-          if (jpeg && holdingRef.current) liveRef.current.frame(now, await jpeg.arrayBuffer());
-          encoding = false;
-        },
-        "image/jpeg",
-        JPEG_QUALITY,
-      );
-    };
-    grab();
-  }
-
-  function press() {
-    unlockSound();
-    if (!cameraOn) return void startCamera();
-    if (holdingRef.current || waitRef.current) return;
-    if (!liveRef.current?.ready()) {
-      return void setError("Not connected to the Ascent yet. Check the Wi-Fi, then try again.");
-    }
-    setError(null);
-    setResult(null);
-    setTyping(false);
-    setHeard({ heard: "", pending: "", face: true });
-    setMood(null);
-    piecesRef.current = [];
-    heldBackRef.current = false;
-    holdingRef.current = true;
-    setHolding(true);
-    liveRef.current.start(getSettings().voice);
-    sendFrames();
-  }
-
-  function release() {
-    unlockSound(); // iPhones count lifting the finger as a tap, not touching down
-    if (!holdingRef.current) return;
-    holdingRef.current = false;
-    setHolding(false);
-    setFinishing(true);
-    liveRef.current.stop();
-    waitRef.current = setTimeout(() => {
-      waitRef.current = null;
-      setFinishing(false);
-      setError("The Ascent didn't answer. Try again.");
-    }, 20_000);
-  }
 
   async function submitTyped(event) {
     event.preventDefault();
@@ -204,7 +63,7 @@ export default function LiveCapture({ onNavigate }) {
     setTyped("");
     setTyping(false);
     setError(null);
-    setFinishing(true);
+    setSending(true);
     try {
       const r = await api.sendText(text, getSettings().voice);
       const piece = { text: r.text, audio: r.audio };
@@ -214,7 +73,7 @@ export default function LiveCapture({ onNavigate }) {
     } catch (err) {
       setError(`Backend error: ${err.message}`);
     } finally {
-      setFinishing(false);
+      setSending(false);
     }
   }
 
@@ -226,7 +85,7 @@ export default function LiveCapture({ onNavigate }) {
   const live = holding || (finishing && heard);
   const status = holding
     ? { label: "READING", tone: "bg-red-500/10 text-red-500", dot: "bg-red-500 animate-pulse" }
-    : finishing
+    : finishing || sending
       ? { label: "THINKING", tone: "bg-butter text-butter-deep dark:bg-butter-deep/25 dark:text-butter", dot: "bg-butter-deep animate-pulse" }
       : speaking > 0
         ? { label: "SPEAKING", tone: "bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint", dot: "bg-accent animate-pulse" }
@@ -370,7 +229,7 @@ export default function LiveCapture({ onNavigate }) {
               </button>
             ) : (
               <p className="rounded-xl border border-dashed border-line px-3.5 py-6 text-center text-sm text-muted dark:border-line-dark">
-                {error ?? (finishing ? "Reading your sentence…" : "Hold the button and mouth a sentence, or type one below.")}
+                {error ?? (finishing || sending ? "Reading your sentence…" : "Hold the button and mouth a sentence, or type one below.")}
               </p>
             )}
             {error && (live || result?.text) && (
@@ -425,16 +284,8 @@ export default function LiveCapture({ onNavigate }) {
               title={holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera"}
               aria-label={holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera"}
               aria-pressed={holding}
-              disabled={finishing && !holding}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.currentTarget.setPointerCapture?.(e.pointerId); // lifting the finger anywhere releases
-                press();
-              }}
-              onPointerUp={release}
-              onPointerCancel={release}
-              onLostPointerCapture={release}
-              onContextMenu={(e) => e.preventDefault()}
+              disabled={(finishing || sending) && !holding}
+              {...holdButton}
               className={`grid size-[72px] touch-none select-none place-items-center rounded-full text-white ring-4 transition [-webkit-touch-callout:none] disabled:opacity-50 ${
                 holding
                   ? "scale-110 bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/30"

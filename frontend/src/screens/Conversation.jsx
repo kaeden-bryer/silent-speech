@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { api, play, unlockSound } from "../api.js";
+import { api, play, playInOrder, unlockSound } from "../api.js";
 import { getSettings, useSettings } from "../settings.js";
-import { useClipRecorder } from "../useClipRecorder.js";
+import { useLiveReader } from "../useLiveReader.js";
 import { Avatar, Icon, Logo, paths } from "../components/ui.jsx";
 
-// The phone-call channel: dial a real number (Twilio, backend/phone.py), then
-// every mouthed or typed sentence is spoken into the call. What the other person
-// says comes back as captions in GET /api/history, polled while the call is on.
+// The phone-call channel: dial a real number (Twilio, backend/phone.py), then hold the
+// button and mouth: the lips are read live and each group of words is spoken into the call
+// as soon as it is sure (backend/server.py read_live). Typed sentences go in too. What the
+// other person says comes back as captions in GET /api/history, polled while the call is on.
 
 const QUICK_PHRASES = ["Yes", "No", "Can you repeat that?", "One moment please"];
 const POLL_MS = 700;
@@ -42,8 +43,13 @@ export default function Conversation({ onNavigate }) {
   const [typed, setTyped] = useState("");
   const endRef = useRef(null);
 
-  const { videoRef, cameraOn, recording, toggle } = useClipRecorder({
-    onClip: (clip) => send(api.sendVideo(clip)),
+  // Hold to speak, live: the server says each group of words into the call as soon as it is read
+  const { videoRef, cameraOn, holding, finishing, heard, holdButton } = useLiveReader({
+    onSay: (piece) => getSettings().hearMyself && playInOrder(piece),
+    onDone({ text }) {
+      if (!text) setError("Didn't catch that — hold the button while you mouth, or type it.");
+      refresh();
+    },
     onError: setError,
   });
 
@@ -189,7 +195,7 @@ export default function Conversation({ onNavigate }) {
         </form>
       ) : (
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
-          {/* Camera + record: the same tap-to-start / tap-to-stop as the live screen */}
+          {/* Camera + hold to speak: the same as the live screen */}
           <div className="flex flex-col gap-3 md:w-[360px] md:shrink-0">
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl bg-camera shadow-xl shadow-black/20">
               <video
@@ -200,26 +206,41 @@ export default function Conversation({ onNavigate }) {
                 className={`absolute inset-0 size-full -scale-x-100 object-cover ${cameraOn ? "" : "hidden"}`}
               />
               <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-                {recording ? "Reading your lips…" : busy ? "Saying it…" : cameraOn ? "Camera on ✓" : "Camera off"}
+                {holding
+                  ? "Reading your lips… release to stop"
+                  : finishing || busy
+                    ? "Saying it…"
+                    : cameraOn
+                      ? "Hold the button to speak"
+                      : "Tap the button for the camera"}
               </div>
+              {heard && (heard.heard || heard.pending || !heard.face) && (
+                <div aria-live="polite" className="absolute inset-x-3 bottom-3 rounded-2xl bg-black/55 px-4 py-2 text-sm font-semibold text-white backdrop-blur">
+                  {heard.face ? (
+                    <>
+                      {heard.heard} <span className="text-white/50">{heard.pending}</span>
+                    </>
+                  ) : (
+                    "Can't see your face — hold the phone in front of you."
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-center gap-[24px]">
               <button
-                title={recording ? "Stop and say it" : cameraOn ? "Start reading" : "Start camera"}
-                aria-label={recording ? "Stop and say it" : cameraOn ? "Start reading" : "Start camera"}
-                onClick={() => {
-                  unlockSound();
-                  toggle();
-                }}
-                disabled={busy}
-                className={`grid size-[72px] place-items-center rounded-full text-white ring-4 transition disabled:opacity-50 ${
-                  recording
-                    ? "bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/20 hover:bg-red-600"
+                title={holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera"}
+                aria-label={holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera"}
+                aria-pressed={holding}
+                disabled={(busy || finishing) && !holding}
+                {...holdButton}
+                className={`grid size-[72px] touch-none select-none place-items-center rounded-full text-white ring-4 transition [-webkit-touch-callout:none] disabled:opacity-50 ${
+                  holding
+                    ? "scale-110 bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/30"
                     : "bg-accent shadow-accent ring-accent/20 hover:bg-accent-strong"
                 }`}
               >
-                {recording ? (
-                  <span className="size-6 rounded-md bg-white" />
+                {holding ? (
+                  <span className="size-6 animate-pulse rounded-md bg-white" />
                 ) : (
                   <Icon d={cameraOn ? paths.speaker : paths.camera} className="size-7" />
                 )}

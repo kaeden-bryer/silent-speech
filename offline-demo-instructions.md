@@ -66,9 +66,11 @@ Then check the iPhone is joined to **SilentSpeech**.
 ### 2. Start the app on the Ascent
 ```bash
 cd ~/Github/silent-speech/backend
-source ../.venv/bin/activate
+source .venv/bin/activate
 python server.py
 ```
+> **After every `git pull` or branch switch**, rebuild the website first: `cd ~/Github/silent-speech/frontend && npm run build`. `frontend/dist` is not in git, so without it the phone keeps getting the old page (e.g. tap-to-record instead of hold-to-speak).
+
 Wait until you see `Uvicorn running on https://0.0.0.0:8000`. The first start takes a minute or two while the models load. (`Serving HTTPS on port 8000` appears near the start, before the models load, so it does not mean the app is ready yet.)
 
 > If it says `serving plain HTTP`, the `certs/` folder is missing. Run `scripts/setup_network.sh certs` (Part 1, step 3) and start again. The iPhone camera will not work over plain HTTP.
@@ -86,10 +88,9 @@ In Safari, go to:
 - Hold the phone so your face is in the picture, in good, even light.
 
 ### 4. Use it
-1. Tap once to **start recording**.
-2. Silently mouth a short sentence (3–8 words work best). Look at the camera.
-3. Tap again to **stop**.
-4. After a moment the phone speaks the sentence out loud.
+1. Tap the round button once to turn the camera on.
+2. **Hold** the button and silently mouth a short sentence (3–8 words work best). Look at the camera.
+3. The phone says the words while you are still mouthing. **Release** when you are done: the last words follow right away.
 
 Phrases from `backend/demo_phrases.txt` work most reliably.
 
