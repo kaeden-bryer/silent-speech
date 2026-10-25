@@ -1,0 +1,6 @@
+results/
+debug_roi/
+__pycache__/
+# recordings and faces: never commit
+dataset/
+recorder/.certs/
