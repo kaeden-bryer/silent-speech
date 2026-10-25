@@ -37,6 +37,7 @@ def safe(step, fallback):
 
 
 lipreading = load("lipreading")
+llm_correction = load("llm_correction")
 correction = load("correction")
 emotion = load("emotion")
 tts = load("tts")
@@ -52,7 +53,8 @@ call_active = False
 
 
 def speak(raw_text, video_path=None):
-    text = safe(lambda: correction.correct(raw_text, history), raw_text)
+    fixed = safe(lambda: llm_correction.llm_correct(raw_text, history), raw_text)  # the LLM fixes it
+    text = safe(lambda: correction.correct(fixed, history), fixed)  # then snaps it to a demo phrase
     feeling = safe(lambda: emotion.detect_emotion(video_path, raw_text), "neutral")
     audio = safe(lambda: tts.text_to_speech(text, feeling), None)
     history.append({"speaker": "me", "text": text})

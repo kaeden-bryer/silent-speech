@@ -12,6 +12,7 @@ Everyone works in their own file. Each file has one function that returns a fake
 |---|---|---|
 | 1. Website | `frontend/index.html` | the page: camera, recording, playing the voice |
 | 2. Lip reading | `backend/lipreading.py` | `lip_read(video_path)` → text |
+| 3. Correction | `backend/llm_correction.py` | `llm_correct(raw_text, history)` → fixed text, by a local LLM using the conversation. Runs first |
 | 3. Correction | `backend/correction.py` | `correct(raw_text, history)` → fixed text |
 | 3. Voice | `backend/tts.py` | `text_to_speech(text, emotion)` → MP3 bytes, or `None` for the browser voice |
 | 4. Emotion | `backend/emotion.py` | `detect_emotion(video_path, text)` → `"neutral"`, `"energetic"`, `"sad"` or `"angry"` |
