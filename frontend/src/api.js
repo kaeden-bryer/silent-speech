@@ -30,7 +30,16 @@ export const api = {
   // -> { history: [{speaker: "me" | "them", text}], call_active }
   history: () => request("/api/history"),
 
-  call: (number) => request("/api/call", json({ number })),
+  // -> {ok, listen}: `listen` is the key to hear them live (hearCall), kept for this tab
+  async call(number) {
+    const r = await request("/api/call", json({ number }));
+    try {
+      sessionStorage.setItem("listen", r.listen ?? "");
+    } catch {
+      /* storage blocked: no live audio after a reload, captions still work */
+    }
+    return r;
+  },
   hangup: () => request("/api/hangup", { method: "POST" }),
 };
 
@@ -189,4 +198,64 @@ export function unlockSound() {
   if (unlocked || !player.paused) return; // once is enough, and doing it again would cut off a sentence
   player.src = SILENCE;
   player.play().then(() => (unlocked = true), () => {}); // refused outside a tap: try again at the next one
+}
+
+// G.711 mu-law (phone audio) byte -> sample, the same table as backend/phone.py
+const MULAW = Float32Array.from({ length: 256 }, (_, byte) => {
+  const b = ~byte & 0xff;
+  const magnitude = ((((b & 0x0f) << 3) + 0x84) << ((b >> 4) & 0x07)) - 0x84;
+  return (b & 0x80 ? -magnitude : magnitude) / 32768;
+});
+const CUSHION = 0.12; // seconds of their voice buffered, so network hiccups don't break it up
+
+// The other person on a call, live (backend/phone.py): 100 ms of 8 kHz phone audio at a time,
+// played back to back with Web Audio. Returns {close(), mute(bool)}.
+export function hearCall() {
+  let ws;
+  let closed = false;
+  let muted = false;
+  let at = 0; // when the audio already set to play ends
+  let last = 0; // the previous sample, to join chunks smoothly
+  function open() {
+    let key = "";
+    try {
+      key = sessionStorage.getItem("listen") ?? "";
+    } catch {
+      /* see api.call */
+    }
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/call/audio?key=${encodeURIComponent(key)}`);
+    ws.binaryType = "arraybuffer";
+    ws.onmessage = (e) => {
+      const ctx = sound();
+      if (muted || ctx?.state !== "running") return;
+      const bytes = new Uint8Array(e.data);
+      const samples = new Float32Array(bytes.length * 3); // 8 kHz -> 24 kHz, which every browser plays
+      bytes.forEach((byte, i) => {
+        const s = MULAW[byte];
+        for (let k = 0; k < 3; k++) samples[3 * i + k] = last + ((s - last) * (k + 1)) / 3;
+        last = s;
+      });
+      const buffer = ctx.createBuffer(1, samples.length, 24000);
+      buffer.copyToChannel(samples, 0);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      if (at < ctx.currentTime) at = ctx.currentTime + CUSHION; // the start, or after a gap
+      source.start(at);
+      at += buffer.duration;
+    };
+    ws.onclose = (e) => {
+      if (!closed && e.code !== 4403) setTimeout(open, 1000); // 4403: not our call's key
+    };
+  }
+  open();
+  return {
+    close() {
+      closed = true;
+      ws.close();
+    },
+    mute(value) {
+      muted = value;
+    },
+  };
 }

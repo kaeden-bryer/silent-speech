@@ -9,6 +9,8 @@ How: Twilio dials the number. When they answer, Twilio opens a WebSocket to /ws/
 8 kHz mu-law. say() sends our Kokoro voice down it. What the other person says is cut
 into sentences (a simple loudness check) and turned into text by stt.py; it goes into
 `history`: the website shows it as captions and the corrections use it as context.
+Their voice is also passed on live, 100 ms at a time, to the app's call screen
+(/api/call/audio), so the user hears them too. Only with the call's own key: the tunnel is public.
 
 Keys in backend/.env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_NUMBER (+15551234567).
 Needs the internet (the tunnel + Twilio); everything else in the app still works without it.
@@ -43,11 +45,13 @@ SPEECH = 500  # loudness (RMS of 16-bit samples) above which a frame counts as s
 PAUSE = 30  # frames of quiet (600 ms) that end a sentence
 LONGEST = 750  # frames (15 s): cut a sentence here even if they keep talking
 LEAD_IN = 10  # frames kept from before the speech started, so the first sound isn't cut off
+PASS_ON = 5  # frames (100 ms) of their voice sent to the app at a time
 
 router = APIRouter()
 history = []  # the list from server.py, given to start_call
-call = {}  # the current call: sid, token, and once answered: ws, loop, stream
+call = {}  # the current call: sid, token, listen key, and once answered: ws, loop, stream
 captions = ThreadPoolExecutor(1)  # one at a time, so captions stay in order
+ears = set()  # the app's call screens hearing the other person live
 
 
 def start_call(number: str, history_list: list[dict]) -> None:
@@ -70,8 +74,13 @@ def start_call(number: str, history_list: list[dict]) -> None:
         status_callback=f"https://{PUBLIC_HOST}/twilio/status",
         status_callback_event=["completed"],
     )
-    call.update(sid=placed.sid, secret=secret)
+    call.update(sid=placed.sid, secret=secret, listen=secrets.token_urlsafe(16))
     print(f"Calling {number} ({placed.sid})", flush=True)
+
+
+def listen_key() -> str | None:
+    """The key the app's call screen needs to hear the other person (given to whoever dialed)."""
+    return call.get("listen")
 
 
 def say(text: str, audio: bytes | None) -> None:
@@ -108,6 +117,7 @@ async def media_stream(ws: WebSocket):
     """Twilio's side of the call: the other person's voice in, ours out."""
     await ws.accept()
     listener = Listener()
+    heard = bytearray()  # their voice not yet passed on to the app
     try:
         async for message in ws.iter_text():
             event = json.loads(message)
@@ -119,7 +129,12 @@ async def media_stream(ws: WebSocket):
                 call.update(ws=ws, loop=asyncio.get_running_loop(), stream=start["streamSid"])
                 print("Call answered", flush=True)
             elif event["event"] == "media" and "ws" in call:
-                listener.hear(base64.b64decode(event["media"]["payload"]))
+                chunk = base64.b64decode(event["media"]["payload"])
+                listener.hear(chunk)
+                heard += chunk
+                if len(heard) >= PASS_ON * FRAME:
+                    await pass_on(bytes(heard))
+                    heard.clear()
             elif event["event"] == "stop":
                 break
     except WebSocketDisconnect:
@@ -129,6 +144,30 @@ async def media_stream(ws: WebSocket):
         if call.get("ws") is ws:
             call.clear()
             print("Call ended", flush=True)
+
+
+async def pass_on(sound):
+    for ear in list(ears):
+        try:
+            await ear.send_bytes(sound)
+        except Exception:  # that screen is gone
+            ears.discard(ear)
+
+
+@router.websocket("/api/call/audio")
+async def call_audio(ws: WebSocket, key: str = ""):
+    """The other person's voice, live, for the app's call screen: 8 kHz mu-law, 100 ms at a time."""
+    await ws.accept()
+    if not key or key != call.get("listen"):
+        return await ws.close(code=4403)  # not the one who dialed this call
+    ears.add(ws)
+    try:
+        while True:
+            await ws.receive_text()  # nothing comes this way: this just waits until the screen goes away
+    except WebSocketDisconnect:
+        pass
+    finally:
+        ears.discard(ws)
 
 
 @router.post("/twilio/status")

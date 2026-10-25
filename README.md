@@ -53,7 +53,8 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 | `POST /api/video` | form field `video`: the recorded clip | result |
 | `POST /api/text` | `{"text": "...", "voice": "am_michael"}` (voice optional) | result |
 | `GET /api/history` | | `{"history": [{"speaker": "me" or "them", "text": "..."}], "call_active": true/false}` |
-| `POST /api/call` | `{"number": "+15551234567"}` | `{"ok": true}`, or an error if calls aren't set up |
+| `POST /api/call` | `{"number": "+15551234567"}` | `{"ok": true, "listen": "<key>"}`, or an error if calls aren't set up |
+| `WebSocket /api/call/audio?key=<listen>` | | the other person's voice, live: 8 kHz mu-law, 100 ms per message |
 | `POST /api/hangup` | | `{"ok": true}` |
 
 Twilio's routes (not for the website): `wss://app.silent-speech.us/ws/twilio` carries the call audio both ways (8 kHz mu-law), and `POST /twilio/status` tells us when the call is over. `call_active` turns `false` on its own when the other person hangs up.

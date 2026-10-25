@@ -1,10 +1,6 @@
 import { useSettings } from "../settings.js";
-import { Icon, paths } from "../components/ui.jsx";
 
-// Settings, wired client-side only (the backend isn't finished):
-// theme + text size apply globally, auto-speak / confirm-numbers / smoothing
-// change how the live screen behaves. Captions and hear-myself shape the call
-// screen; opening line and filler persist but do nothing yet (see FEATURES.md).
+// Settings, stored on this phone (settings.js): the voice and when it speaks, calls, and looks.
 
 // Kokoro voices the Ascent has (VOICES in backend/emotional_tts.py)
 const VOICES = [
@@ -14,15 +10,10 @@ const VOICES = [
   { value: "af_heart", label: "Heart (female)" },
 ];
 
-function Card({ icon, iconTone, title, children }) {
+function Card({ title, children }) {
   return (
-    <section className="mt-4 rounded-3xl border border-line bg-card p-5 shadow-sm shadow-black/5 first:mt-0 dark:border-line-dark dark:bg-panel">
-      <div className="mb-4 flex items-center gap-3">
-        <span className={`grid size-[46px] shrink-0 place-items-center rounded-2xl ${iconTone}`}>
-          <Icon d={icon} className="size-5.5" />
-        </span>
-        <h2 className="text-base font-extrabold">{title}</h2>
-      </div>
+    <section className="mt-4 rounded-3xl border border-line bg-card px-5 py-3 first:mt-0 dark:border-line-dark dark:bg-panel">
+      <h2 className="pt-1 text-xs font-bold tracking-widest text-muted uppercase">{title}</h2>
       {children}
     </section>
   );
@@ -30,9 +21,9 @@ function Card({ icon, iconTone, title, children }) {
 
 function Row({ label, detail, children }) {
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="flex items-center gap-3 py-2.5">
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold">{label}</div>
+        <div className="text-base font-semibold">{label}</div>
         {detail && <div className="text-xs text-muted">{detail}</div>}
       </div>
       {children}
@@ -40,15 +31,14 @@ function Row({ label, detail, children }) {
   );
 }
 
-function Toggle({ on, onChange }) {
+function Toggle({ on, onChange, label }) {
   return (
     <button
       role="switch"
       aria-checked={on}
+      aria-label={label}
       onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-        on ? "bg-accent" : "bg-muted/30 dark:bg-panel-2"
-      }`}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition ${on ? "bg-accent" : "bg-muted/30 dark:bg-panel-2"}`}
     >
       <span
         className={`absolute left-1 top-1/2 size-5 -translate-y-1/2 rounded-full bg-white shadow transition-transform ${
@@ -59,61 +49,50 @@ function Toggle({ on, onChange }) {
   );
 }
 
-function Segmented({ options, value, onChange }) {
-  return (
-    <div className="flex shrink-0 rounded-full border border-line p-1 dark:border-line-dark">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
-            o.value === value
-              ? "bg-accent text-white"
-              : "text-muted hover:text-body dark:hover:text-white"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export default function Settings({ onNavigate }) {
+export default function Settings() {
   const [settings, update] = useSettings();
 
   return (
-    <div className="mx-auto w-full max-w-xl px-5 pb-24 pt-6 sm:pt-10">
-      <header className="mb-6 flex items-center gap-3">
-        <button
-          onClick={() => onNavigate("live")}
-          aria-label="Back to live capture"
-          className="grid size-10 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-        >
-          <Icon d={paths.back} className="size-5.5" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted">Make it yours</p>
-        </div>
-      </header>
+    <div className="mx-auto w-full max-w-md px-5 pb-28 pt-5">
+      <h1 className="mb-4 text-lg font-extrabold">Settings</h1>
 
-      <Card
-        icon={paths.settings}
-        iconTone="bg-lavender text-lavender-deep dark:bg-accent/20 dark:text-lavender"
-        title="Appearance"
-      >
-        <Row label="Theme" detail="Light works best in bright rooms">
-          <Segmented
-            options={[
-              { value: "light", label: "Light" },
-              { value: "dark", label: "Dark" },
-            ]}
-            value={settings.theme}
-            onChange={(theme) => update({ theme })}
-          />
+      <Card title="Voice">
+        <Row label="Voice" detail="Its tone follows your face">
+          <select
+            value={settings.voice}
+            onChange={(e) => update({ voice: e.target.value })}
+            aria-label="Voice"
+            className="shrink-0 rounded-full border border-line bg-transparent px-3.5 py-1.5 text-sm font-semibold outline-none focus:border-accent dark:border-line-dark"
+          >
+            {VOICES.map((v) => (
+              <option key={v.value} value={v.value}>
+                {v.label}
+              </option>
+            ))}
+          </select>
         </Row>
-        <Row label="Text size" detail="Everything scales together">
+        <Row label="Speak right away" detail="Off: wait for a tap on ▶">
+          <Toggle label="Speak right away" on={settings.autoSpeak} onChange={(autoSpeak) => update({ autoSpeak })} />
+        </Row>
+        <Row label="Check numbers first" detail="Sentences with a number wait for a tap">
+          <Toggle label="Check numbers first" on={settings.confirmNumbers} onChange={(confirmNumbers) => update({ confirmNumbers })} />
+        </Row>
+      </Card>
+
+      <Card title="Calls">
+        <Row label="Show what they say" detail="Captions of the other person">
+          <Toggle label="Show what they say" on={settings.captions} onChange={(captions) => update({ captions })} />
+        </Row>
+        <Row label="Hear myself" detail="Also play your words on this phone">
+          <Toggle label="Hear myself" on={settings.hearMyself} onChange={(hearMyself) => update({ hearMyself })} />
+        </Row>
+      </Card>
+
+      <Card title="Display">
+        <Row label="Dark mode">
+          <Toggle label="Dark mode" on={settings.theme === "dark"} onChange={(dark) => update({ theme: dark ? "dark" : "light" })} />
+        </Row>
+        <Row label="Text size">
           <div className="flex items-center gap-2 text-muted">
             <span className="text-xs font-bold">A</span>
             <input
@@ -128,78 +107,6 @@ export default function Settings({ onNavigate }) {
             />
             <span className="text-lg font-bold">A</span>
           </div>
-        </Row>
-      </Card>
-
-      <Card
-        icon={paths.speaker}
-        iconTone="bg-mint text-mint-deep dark:bg-mint-deep/25 dark:text-mint"
-        title="Speaking"
-      >
-        <Row label="Your voice" detail="Cloned from your recording">
-          <button
-            onClick={() => onNavigate("setup")}
-            className="rounded-full bg-accent-soft px-3.5 py-1.5 text-sm font-bold text-accent-strong transition hover:bg-accent hover:text-white dark:bg-accent/15 dark:text-accent-tint"
-          >
-            Change
-          </button>
-        </Row>
-        <Row label="Voice" detail="How you sound: changes with your face's emotion">
-          <select
-            value={settings.voice}
-            onChange={(e) => update({ voice: e.target.value })}
-            aria-label="Voice"
-            className="shrink-0 rounded-full border border-line bg-transparent px-3.5 py-1.5 text-sm font-semibold outline-none focus:border-accent dark:border-line-dark"
-          >
-            {VOICES.map((v) => (
-              <option key={v.value} value={v.value}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-        </Row>
-        <Row label="Auto-speak" detail="Speak right away when a result arrives">
-          <Toggle on={settings.autoSpeak} onChange={(autoSpeak) => update({ autoSpeak })} />
-        </Row>
-        <Row label="Confirm numbers first" detail="Results with digits wait for a tap">
-          <Toggle on={settings.confirmNumbers} onChange={(confirmNumbers) => update({ confirmNumbers })} />
-        </Row>
-      </Card>
-
-      <Card
-        icon={paths.keyboard}
-        iconTone="bg-sky text-sky-deep dark:bg-sky-deep/25 dark:text-sky"
-        title="Captions & calls"
-      >
-        <p className="-mt-2 mb-2 text-xs text-muted">
-          Opening line and filler are saved but not played into calls yet.
-        </p>
-        <Row label="Live captions" detail="Show what the other person says">
-          <Toggle on={settings.captions} onChange={(captions) => update({ captions })} />
-        </Row>
-        <Row label="Hear myself" detail="Also play your sentences on this phone during a call">
-          <Toggle on={settings.hearMyself} onChange={(hearMyself) => update({ hearMyself })} />
-        </Row>
-        <Row label="Opening line" detail='"Hi — I speak through an app, one moment"'>
-          <Toggle on={settings.openingLine} onChange={(openingLine) => update({ openingLine })} />
-        </Row>
-        <Row label="Hold-on filler" detail="Plays while you mouth your reply">
-          <Toggle on={settings.filler} onChange={(filler) => update({ filler })} />
-        </Row>
-      </Card>
-
-      <Card
-        icon={paths.bookmark}
-        iconTone="bg-peach text-peach-deep dark:bg-peach-deep/25 dark:text-peach"
-        title="Phrase bank"
-      >
-        <Row label={`${settings.phrases.length} saved phrase${settings.phrases.length === 1 ? "" : "s"}`} detail="One tap, never misread">
-          <button
-            onClick={() => onNavigate("setup")}
-            className="rounded-full bg-accent-soft px-3.5 py-1.5 text-sm font-bold text-accent-strong transition hover:bg-accent hover:text-white dark:bg-accent/15 dark:text-accent-tint"
-          >
-            Edit
-          </button>
         </Row>
       </Card>
     </div>

@@ -1,30 +1,28 @@
 import { useEffect, useState } from "react";
 import { useSettings } from "./settings.js";
 import Welcome from "./screens/Welcome.jsx";
-import Setup from "./screens/Setup.jsx";
 import LiveCapture from "./screens/LiveCapture.jsx";
 import Practice from "./screens/Practice.jsx";
 import Settings from "./screens/Settings.jsx";
 import Conversation from "./screens/Conversation.jsx";
+import { Icon, paths } from "./components/ui.jsx";
+// screens/Setup.jsx (voice cloning, permissions, phrase bank) is parked: see FEATURES.md.
 
 const SCREENS = [
-  { id: "welcome", label: "Welcome", component: Welcome },
-  { id: "live", label: "Live", component: LiveCapture },
-  { id: "practice", label: "Practice", component: Practice },
-  { id: "setup", label: "Setup", component: Setup },
-  { id: "call", label: "Call", component: Conversation },
-  { id: "settings", label: "Settings", component: Settings, hidden: true },
+  { id: "welcome", component: Welcome }, // the introduction, without the tab bar
+  { id: "live", label: "Speak", icon: paths.speaker, component: LiveCapture },
+  { id: "call", label: "Call", icon: paths.phone, component: Conversation },
+  { id: "practice", label: "Practice", icon: paths.check, component: Practice },
+  { id: "settings", label: "Settings", icon: paths.settings, component: Settings },
 ];
 
 export default function App() {
-  // #welcome / #live / #setup / #call / #settings deep-link straight to a mockup
+  // #welcome / #live / #call / #practice / #settings deep-link straight to a screen
   const [screen, setScreen] = useState(() => {
     const hash = window.location.hash.slice(1);
     return SCREENS.some((s) => s.id === hash) ? hash : "welcome";
   });
-  const [settings, updateSettings] = useSettings();
-  const dark = settings.theme === "dark";
-  const toggleDark = () => updateSettings({ theme: dark ? "light" : "dark" });
+  const [settings] = useSettings();
 
   useEffect(() => {
     window.location.hash = screen;
@@ -41,8 +39,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
+    document.documentElement.classList.toggle("dark", settings.theme === "dark");
+  }, [settings.theme]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--text-scale", settings.textScale);
@@ -53,26 +51,29 @@ export default function App() {
   return (
     <div className="app-bg h-full overflow-y-auto text-body dark:text-white">
       {/* key remounts the screen so the enter transition plays on navigation */}
-      <div key={screen} className={`h-full ${screen === "settings" ? "screen-enter-right" : "screen-enter"}`}>
-        <Active onNavigate={setScreen} dark={dark} onToggleDark={toggleDark} />
+      <div key={screen} className="screen-enter h-full">
+        <Active onNavigate={setScreen} />
       </div>
 
-      {/* Demo-only chrome: lets the team flip between mockups and themes */}
-      <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card p-1 shadow-lg shadow-black/10 dark:border-line-dark dark:bg-panel">
-        {SCREENS.filter((s) => !s.hidden).map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setScreen(s.id)}
-            className={`rounded-full px-2.5 py-1.5 text-xs font-semibold transition sm:px-4 sm:text-sm ${
-              screen === s.id
-                ? "bg-accent text-white"
-                : "text-muted hover:text-body dark:hover:text-white"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      {screen !== "welcome" && (
+        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-line-dark dark:bg-panel/95">
+          <div className="mx-auto flex max-w-md">
+            {SCREENS.filter((s) => s.label).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setScreen(s.id)}
+                aria-current={screen === s.id ? "page" : undefined}
+                className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition ${
+                  screen === s.id ? "text-accent" : "text-muted hover:text-body dark:hover:text-white"
+                }`}
+              >
+                <Icon d={s.icon} className="size-6" />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

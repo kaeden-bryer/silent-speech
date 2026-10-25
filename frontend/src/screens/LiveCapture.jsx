@@ -1,18 +1,12 @@
 import { useRef, useState } from "react";
 import { api, playInOrder, unlockSound } from "../api.js";
-import { getSettings, useSettings } from "../settings.js";
+import { getSettings } from "../settings.js";
 import { useLiveReader } from "../useLiveReader.js";
-import { EmotionChip, Icon, Logo, paths } from "../components/ui.jsx";
+import { CameraChip, EmotionChip, HoldButton, Icon, Logo, SideButton, paths } from "../components/ui.jsx";
 
-// The app's home screen, wired to the backend: hold the button and mouth a sentence.
-// The lips are read live on the Ascent (backend/streaming.py, through useLiveReader) and each
-// group of words is spoken as soon as it is sure, while you are still mouthing. Release to stop.
-// Typing a sentence works too.
-
-const CHANNELS = [
-  { label: "Speaker", icon: paths.speaker, active: true },
-  { label: "Phone call", icon: paths.phone, screen: "call" },
-];
+// The home screen: hold the button and mouth a sentence. The lips are read live on the
+// Ascent (backend/streaming.py, through useLiveReader) and each group of words is spoken as
+// soon as it is sure, while you are still mouthing. Release to stop. Typing works too.
 
 // Speak right away, unless the settings say to wait for a tap
 function speaksByItself(text) {
@@ -20,8 +14,7 @@ function speaksByItself(text) {
   return s.autoSpeak && !(s.confirmNumbers && /\d/.test(text));
 }
 
-export default function LiveCapture({ onNavigate }) {
-  const [settings] = useSettings();
+export default function LiveCapture() {
   const piecesRef = useRef([]); // what the server voiced during this hold
   const heldBackRef = useRef(false); // a piece waited for a tap instead of playing
   const [result, setResult] = useState(null); // {text, emotion, pieces, spoken} once said
@@ -83,233 +76,105 @@ export default function LiveCapture({ onNavigate }) {
   }
 
   const live = holding || (finishing && heard);
-  const status = holding
-    ? { label: "READING", tone: "bg-red-500/10 text-red-500", dot: "bg-red-500 animate-pulse" }
+  const state = holding
+    ? "Reading your lips… release to stop"
     : finishing || sending
-      ? { label: "THINKING", tone: "bg-butter text-butter-deep dark:bg-butter-deep/25 dark:text-butter", dot: "bg-butter-deep animate-pulse" }
+      ? "Thinking…"
       : speaking > 0
-        ? { label: "SPEAKING", tone: "bg-accent-soft text-accent-strong dark:bg-accent/15 dark:text-accent-tint", dot: "bg-accent animate-pulse" }
-        : cameraOn && !connected
-          ? { label: "CONNECTING", tone: "bg-butter text-butter-deep dark:bg-butter-deep/25 dark:text-butter", dot: "bg-butter-deep animate-pulse" }
-          : { label: cameraOn ? "READY" : "CAMERA OFF", tone: "bg-mint text-mint-deep dark:bg-mint-deep/25 dark:text-mint", dot: "bg-mint-deep" };
+        ? "Speaking…"
+        : connected
+          ? "Hold the button to speak"
+          : "Connecting to the Ascent…";
+  const feeling = live ? mood : result?.emotion;
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-24 pt-5 md:max-w-[1024px]">
-      <header className="mb-4 flex items-center gap-3 md:mb-7">
-        <Logo className="size-[40px]" />
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-extrabold md:text-2xl md:tracking-tight">Silent Speech</div>
-        </div>
-        <span
-          role="status"
-          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${status.tone}`}
-        >
-          <span className={`size-1.5 rounded-full ${status.dot}`} />
-          {status.label}
-        </span>
-        <button
-          title="Settings"
-          aria-label="Settings"
-          onClick={() => onNavigate("settings")}
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-        >
-          <Icon d={paths.settings} className="size-5.5" />
-        </button>
+    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-28 pt-5">
+      <header className="mb-4 flex items-center gap-3">
+        <Logo className="size-9" />
+        <h1 className="text-lg font-extrabold">Silent Speech</h1>
       </header>
 
-      {/* Output channel: where the voice goes */}
-      <div className="mb-4 flex gap-2 overflow-x-auto [scrollbar-width:none] md:mb-7">
-        {CHANNELS.map((c) => (
-          <button
-            key={c.label}
-            onClick={() => c.screen && onNavigate(c.screen)}
-            className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-              c.active
-                ? "bg-accent text-white shadow-accent"
-                : "border border-line bg-card text-muted hover:text-body dark:border-line-dark dark:bg-panel dark:hover:text-white"
-            }`}
-          >
-            <Icon d={c.icon} className="size-4.5" />
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Side by side on desktop, stacked on phones */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
-        {/* Camera preview: stays navy until a real stream is granted */}
-        <div className="relative aspect-[3/4] max-h-[48vh] w-full overflow-hidden rounded-3xl bg-camera shadow-xl shadow-black/20 md:max-h-none md:flex-1">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className={`absolute inset-0 size-full -scale-x-100 object-cover ${cameraOn ? "" : "hidden"}`}
-          />
-
-          {!cameraOn && (
-            <div className="absolute inset-0 grid place-items-center">
-              <button
-                onClick={() => {
-                  unlockSound();
-                  startCamera();
-                }}
-                className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-accent transition hover:bg-accent-strong"
-              >
-                <Icon d={paths.camera} className="size-5" />
-                Start camera
-              </button>
-            </div>
-          )}
-
-          {cameraOn && (
-            <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-              {holding ? "Reading your lips… release to stop" : connected ? "Hold the button to speak" : "Connecting to the Ascent…"}
-            </div>
-          )}
-
-          {(live || result?.text) && (
-            <div className="absolute inset-x-3 bottom-3 rounded-2xl bg-black/55 px-4 py-2.5 backdrop-blur">
-              <div className="text-[10px] font-bold tracking-widest text-white/50 uppercase">
-                {live ? "Reading…" : "Said"}
-              </div>
-              <div className="text-sm font-semibold text-white">
-                {live ? (
-                  <>
-                    {heard?.heard} <span className="text-white/50">{heard?.pending}</span>
-                    {!heard?.heard && !heard?.pending && "…"}
-                  </>
-                ) : (
-                  result.text
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Result + confirm */}
-        <div className="flex flex-col gap-3 md:w-[420px] md:shrink-0">
-          <div className="rounded-2xl border border-line bg-card p-4 dark:border-line-dark dark:bg-panel">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold tracking-widest text-muted uppercase">
-                {live ? "Reading…" : result?.spoken ? "What you said" : "Did you say…"}
-              </span>
-              <span className="flex items-center gap-1.5">
-                {live && mood && mood !== "neutral" && <EmotionChip emotion={mood} />}
-                {!live && result?.emotion && result.emotion !== "neutral" && <EmotionChip emotion={result.emotion} />}
-                {!live && result?.text && !result.spoken && settings.confirmNumbers && /\d/.test(result.text) && (
-                  <span className="rounded-full bg-butter px-2 py-0.5 text-[11px] font-bold text-butter-deep dark:bg-butter-deep/25 dark:text-butter">
-                    has a number — tap to speak
-                  </span>
-                )}
-              </span>
-            </div>
-
-            {live ? (
-              <div aria-live="polite" className="rounded-xl border-2 border-accent bg-accent-soft px-3.5 py-3 text-base font-semibold text-accent-strong dark:bg-accent/15 dark:text-accent-tint">
-                {heard?.heard} <span className="opacity-50">{heard?.pending}</span>
-                {!heard?.heard && !heard?.pending && (holding ? "Mouth your sentence…" : "Finishing…")}
-                {heard && !heard.face && (
-                  <p role="alert" className="mt-1 text-xs font-semibold text-red-500">
-                    Can't see your face — hold the phone in front of you.
-                  </p>
-                )}
-              </div>
-            ) : result?.text ? (
-              <button
-                aria-pressed="true"
-                onClick={sayAgain}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border-2 border-accent bg-accent-soft px-3.5 py-3 text-left text-base font-semibold text-accent-strong transition dark:bg-accent/15 dark:text-accent-tint"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Icon d={paths.check} className="size-4.5 shrink-0" />
-                  <span className="min-w-0 break-words">{result.text}</span>
-                </span>
-                <span className="shrink-0 text-xs">{result.spoken ? "spoken ✓" : "tap to speak"}</span>
-              </button>
-            ) : (
-              <p className="rounded-xl border border-dashed border-line px-3.5 py-6 text-center text-sm text-muted dark:border-line-dark">
-                {error ?? (finishing || sending ? "Reading your sentence…" : "Hold the button and mouth a sentence, or type one below.")}
-              </p>
-            )}
-            {error && (live || result?.text) && (
-              <p role="alert" className="mt-2 text-center text-xs font-semibold text-red-500">
-                {error}
-              </p>
-            )}
-
+      <div className="relative aspect-[3/4] max-h-[56vh] w-full overflow-hidden rounded-3xl bg-camera shadow-xl shadow-black/20">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 size-full -scale-x-100 object-cover ${cameraOn ? "" : "hidden"}`}
+        />
+        {cameraOn ? (
+          <CameraChip>{state}</CameraChip>
+        ) : (
+          <div className="absolute inset-0 grid place-items-center">
             <button
-              disabled={!result?.text || live}
-              onClick={sayAgain}
-              className="mt-3 w-full rounded-xl bg-accent py-3 text-base font-bold text-white shadow-accent transition hover:bg-accent-strong disabled:opacity-40 disabled:shadow-none"
+              onClick={() => {
+                unlockSound();
+                startCamera();
+              }}
+              className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-accent transition hover:bg-accent-strong"
             >
-              {result?.spoken ? "Say it again" : result?.text ? `Speak it — "${result.text}"` : "Speak it"}
+              <Icon d={paths.camera} className="size-5" />
+              Start camera
             </button>
-
-            {typing ? (
-              <form onSubmit={submitTyped} className="mt-2 flex gap-2">
-                <input
-                  autoFocus
-                  value={typed}
-                  onChange={(e) => setTyped(e.target.value)}
-                  placeholder="Type a sentence…"
-                  className="min-w-0 flex-1 rounded-xl border border-line bg-transparent px-3 text-base outline-none placeholder:text-muted focus:border-accent dark:border-line-dark"
-                />
-                <button className="rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white transition hover:bg-accent-strong">
-                  <Icon d={paths.send} className="size-5" />
-                </button>
-              </form>
-            ) : (
-              <button
-                onClick={() => setTyping(true)}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2.5 text-sm font-bold text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-              >
-                <Icon d={paths.keyboard} className="size-5" />
-                {result?.text ? "Not right — type it" : "Type instead"}
-              </button>
-            )}
           </div>
+        )}
 
-          {/* Hold-to-speak controls: first on phones so they never need a scroll */}
-          <div className="order-first flex items-center justify-center gap-[24px] py-2 md:order-none">
-            <button
-              title="Keyboard fallback"
-              aria-label="Keyboard fallback"
-              onClick={() => setTyping((t) => !t)}
-              className="grid size-[56px] place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-            >
-              <Icon d={paths.keyboard} />
-            </button>
-            <button
-              title={holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera"}
-              aria-label={holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera"}
-              aria-pressed={holding}
-              disabled={(finishing || sending) && !holding}
-              {...holdButton}
-              className={`grid size-[72px] touch-none select-none place-items-center rounded-full text-white ring-4 transition [-webkit-touch-callout:none] disabled:opacity-50 ${
-                holding
-                  ? "scale-110 bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/30"
-                  : "bg-accent shadow-accent ring-accent/20 hover:bg-accent-strong"
-              }`}
-            >
-              {holding ? (
-                <span className="size-6 animate-pulse rounded-md bg-white" />
+        {/* What is being said, then what was said */}
+        {(live || result?.text) && (
+          <div aria-live="polite" className="absolute inset-x-3 bottom-3 rounded-2xl bg-black/60 px-4 py-3 backdrop-blur">
+            {feeling && feeling !== "neutral" && (
+              <div className="mb-1">
+                <EmotionChip emotion={feeling} />
+              </div>
+            )}
+            <p className="text-lg font-semibold leading-snug text-white">
+              {live ? (
+                <>
+                  {heard?.heard} <span className="text-white/50">{heard?.pending}</span>
+                  {!heard?.heard && !heard?.pending && "…"}
+                </>
               ) : (
-                <Icon d={cameraOn ? paths.speaker : paths.camera} className="size-7" />
+                result.text
               )}
-            </button>
-            <button
-              title="Replay last sentence"
-              aria-label="Replay last sentence"
-              disabled={!result?.text || live}
-              onClick={sayAgain}
-              className="grid size-[56px] place-items-center rounded-full border border-line text-muted transition hover:text-body disabled:opacity-40 dark:border-line-dark dark:hover:text-white"
-            >
-              <Icon d={paths.speaker} />
-            </button>
+            </p>
+            {live && heard && !heard.face && (
+              <p className="mt-1 text-xs font-semibold text-red-300">Can't see your face — hold the phone in front of you.</p>
+            )}
+            {!live && !result.spoken && <p className="mt-1 text-xs text-white/70">Not said yet — tap ▶ to say it.</p>}
           </div>
-        </div>
+        )}
       </div>
+
+      <div className="flex items-center justify-center gap-6 py-5">
+        <SideButton label="Type instead" onClick={() => setTyping((t) => !t)}>
+          <Icon d={paths.keyboard} />
+        </SideButton>
+        <HoldButton holding={holding} cameraOn={cameraOn} disabled={finishing || sending} hold={holdButton} />
+        <SideButton label="Say it again" onClick={sayAgain} disabled={!result?.text || live}>
+          <Icon d={paths.speaker} />
+        </SideButton>
+      </div>
+
+      {typing && (
+        <form onSubmit={submitTyped} className="flex gap-2">
+          <input
+            autoFocus
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder="Type a sentence…"
+            className="min-w-0 flex-1 rounded-xl border border-line bg-card px-3 py-2.5 text-base outline-none placeholder:text-muted focus:border-accent dark:border-line-dark dark:bg-panel"
+          />
+          <button aria-label="Say it" className="rounded-xl bg-accent px-4 text-white transition hover:bg-accent-strong">
+            <Icon d={paths.send} className="size-5" />
+          </button>
+        </form>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-2 text-center text-sm font-semibold text-red-500">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

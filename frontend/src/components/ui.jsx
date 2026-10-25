@@ -1,4 +1,4 @@
-// Small shared pieces for the mockup screens. Purely presentational.
+// Small shared pieces for the screens. Purely presentational.
 
 export function Logo({ className = "size-10" }) {
   return (
@@ -46,6 +46,59 @@ export function EmotionChip({ emotion }) {
   );
 }
 
+// The one status line on a camera preview ("Hold the button to speak", "Reading your lips…")
+export function CameraChip({ children }) {
+  return (
+    <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-bold text-white backdrop-blur">
+      {children}
+    </div>
+  );
+}
+
+// The big round hold-to-speak button. `hold`: the pointer handlers (see useLiveReader.js).
+export function HoldButton({ holding, cameraOn, disabled, hold }) {
+  const label = holding ? "Release to stop" : cameraOn ? "Hold to speak" : "Start camera";
+  return (
+    <button
+      title={label}
+      aria-label={label}
+      aria-pressed={holding}
+      disabled={disabled && !holding}
+      {...hold}
+      className={`grid size-[80px] touch-none select-none place-items-center rounded-full text-white ring-4 transition [-webkit-touch-callout:none] disabled:opacity-50 ${
+        holding
+          ? "scale-110 bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/30"
+          : "bg-accent shadow-accent ring-accent/20 hover:bg-accent-strong"
+      }`}
+    >
+      {holding ? (
+        <span className="size-7 animate-pulse rounded-lg bg-white" />
+      ) : (
+        <Icon d={cameraOn ? paths.speaker : paths.camera} className="size-8" />
+      )}
+    </button>
+  );
+}
+
+// A smaller round button next to it (keyboard, replay, hang up...)
+export function SideButton({ label, onClick, disabled, danger, children }) {
+  return (
+    <button
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={`grid size-[56px] place-items-center rounded-full transition disabled:opacity-40 ${
+        danger
+          ? "bg-red-500 text-white shadow-md shadow-red-500/30 hover:bg-red-600"
+          : "border border-line text-muted hover:text-body dark:border-line-dark dark:hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function Icon({ d, className = "size-6" }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -61,6 +114,7 @@ export const paths = {
   send: "M5 12h13M13 6l6 6-6 6",
   phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z",
   speaker: "M4 10v4h3l5 4V6l-5 4H4zm12-1a4 4 0 0 1 0 6m2.5-9a8 8 0 0 1 0 12",
+  speakerOff: "M4 10v4h3l5 4V6l-5 4H4zm12 0 5 5m0-5-5 5",
   plus: "M12 5v14M5 12h14",
   mic: "M12 3a3 3 0 0 1 3 3v5a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm8 3a8 8 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-2-1.2L15 3h-4l-.4 2.6a8 8 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a8 8 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 2 1.2L11 21h4l.4-2.6a8 8 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.2-.8.2-1.2z",

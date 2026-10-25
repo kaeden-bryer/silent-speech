@@ -15,11 +15,13 @@ Priorities follow the brief: **Must** = demo fails without it · **Should** = ma
 | Stock voice fallback | Should | Mentioned in Setup copy | A default TTS voice when no clone exists (Kokoro already does this once wired) |
 | Phrase bank (one tap, never misread) | Should | Static chips in Setup + Settings | Store per-user phrases; speak them without the lip-reading path |
 | Live partial transcript while mouthing | Nice | "Reading…" overlay exists | Streaming recognition (current API is per-clip); CLAUDE.md's WebSocket design is the natural fit |
-| Call settings that do something | Should | Live captions and hear-myself work; opening line and hold-on filler are persisted toggles only | Opening line / filler = canned audio sent into the call by `phone.py` when it's answered / while the user mouths |
+| Call settings that do something | Should | Live captions and hear-myself work; the opening line and hold-on filler toggles were removed from Settings until they do something | Opening line / filler = canned audio sent into the call by `phone.py` when it's answered / while the user mouths |
+
+**Parked: the Setup screen** (`frontend/src/screens/Setup.jsx`, out of the nav): voice-cloning mockup, permission checklist, phrase bank. Nothing in it is wired yet (the camera is asked for when first used anyway). Re-add it to `SCREENS` in `App.jsx` once voice cloning or the phrase bank works.
 
 ## Phone calls (built, needs the internet)
 
-**The phone-call channel** is wired: the Call screen (`frontend/src/screens/Conversation.jsx`) dials a real number through Twilio Media Streams (`backend/phone.py`). Mouthed, typed or quick-phrase sentences are spoken into the call with Kokoro, and the other side is transcribed locally (`backend/stt.py`, Whisper) into history as live captions. It needs internet on the Ascent plus the `app.silent-speech.us` tunnel; everything else stays offline. The old mockup's sessions sidebar, emotion / "✓ confirmed" chips and speaker-mode toggle were dropped. Bring them back if there's time.
+**The phone-call channel** is wired: the Call screen (`frontend/src/screens/Conversation.jsx`) dials a real number through Twilio Media Streams (`backend/phone.py`). Mouthed (hold to speak, live), typed or quick-phrase sentences are spoken into the call with Kokoro. The other side is heard live on the phone (`/api/call/audio`, only with the dialing screen's key) and transcribed locally (`backend/stt.py`, Whisper large-v3-turbo) into history as captions. It needs internet on the Ascent plus the `app.silent-speech.us` tunnel; everything else stays offline. The old mockup's sessions sidebar, emotion / "✓ confirmed" chips and speaker-mode toggle were dropped. Bring them back if there's time.
 
 Related call features from the brief, not started:
 - Fully offline calls (no Twilio): a LAN call to a second phone on the SilentSpeech Wi-Fi. Keep `start_call/say/hang_up` as the seam — Nice

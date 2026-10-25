@@ -1,5 +1,4 @@
 // App settings: one localStorage-backed store, readable from any component.
-// openingLine and filler persist but do nothing yet (see FEATURES.md).
 
 import { useSyncExternalStore } from "react";
 
@@ -13,9 +12,7 @@ const DEFAULTS = {
   captions: true, // show what the other person on a call says
   hearMyself: false, // also play your sentences on this phone during a call
   callNumber: "", // the last number dialed on the call screen
-  openingLine: true,
-  filler: false,
-  phrases: [
+  phrases: [ // the parked Setup screen's phrase bank (see FEATURES.md)
     "My name is Cara Lee",
     "My date of birth is March 14, 1986",
     "I pick up at the Mission St pharmacy",

@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { api, play, speak, unlockSound } from "../api.js";
-import { Icon, paths } from "../components/ui.jsx";
+import { CameraChip, HoldButton, Icon, SideButton, paths } from "../components/ui.jsx";
 import { PHRASES, initialState, practiceReducer } from "../practice.js";
 
 // Practice mode: mouth the shown phrase, the lip reader reads it back, and
@@ -13,7 +13,7 @@ import { PHRASES, initialState, practiceReducer } from "../practice.js";
 
 const DEMO_FIXTURE = "I need more coffee.";
 
-export default function Practice({ onNavigate }) {
+export default function Practice() {
   const [state, dispatch] = useReducer(practiceReducer, initialState);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -46,10 +46,11 @@ export default function Practice({ onNavigate }) {
     }
   }
 
-  function toggleRecord() {
+  // Hold to speak, like the other screens: recording while the button is held
+  function press() {
     unlockSound();
     if (!cameraOn) return void startCamera();
-    if (phase === "recording") return void recorderRef.current?.stop();
+    if (phase === "recording" || phase === "processing") return;
     const chunks = [];
     const rec = new MediaRecorder(streamRef.current);
     rec.ondataavailable = (e) => chunks.push(e.data);
@@ -61,6 +62,23 @@ export default function Practice({ onNavigate }) {
     rec.start();
     dispatch({ type: "RECORD_START" });
   }
+
+  function release() {
+    unlockSound(); // iPhones count lifting the finger as a tap, not touching down
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  }
+
+  const hold = {
+    onPointerDown(e) {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture?.(e.pointerId); // lifting the finger anywhere releases
+      press();
+    },
+    onPointerUp: release,
+    onPointerCancel: release,
+    onLostPointerCapture: release,
+    onContextMenu: (e) => e.preventDefault(),
+  };
 
   async function recognize(clip) {
     try {
@@ -97,40 +115,18 @@ export default function Practice({ onNavigate }) {
   const score = result?.score;
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-24 pt-5 md:max-w-[1024px]">
-      <header className="mb-4 flex items-center gap-3 md:mb-7">
-        <button
-          onClick={() => onNavigate("live")}
-          aria-label="Back to live capture"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-        >
-          <Icon d={paths.back} className="size-5.5" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base font-extrabold md:text-2xl md:tracking-tight">Practice</h1>
-          <p className="truncate text-sm text-muted">Say it with me</p>
-        </div>
-        {recording && (
-          <span role="status" className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-500">
-            <span className="pulse-1s size-1.5 rounded-full bg-red-500" />
-            READING
-          </span>
-        )}
-        {processing && (
-          <span role="status" className="flex items-center gap-1.5 rounded-full bg-butter px-2.5 py-1 text-[11px] font-bold text-butter-deep dark:bg-butter-deep/25 dark:text-butter">
-            <span className="pulse-1s size-1.5 rounded-full bg-butter-deep" />
-            THINKING
-          </span>
-        )}
-        <span className="shrink-0 rounded-full bg-lavender px-2.5 py-1 text-[11px] font-bold text-lavender-deep dark:bg-accent/20 dark:text-lavender">
-          Phrase {state.phraseIndex + 1} of {PHRASES.length}
+    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-28 pt-5">
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-lg font-extrabold">Practice</h1>
+        <span className="shrink-0 rounded-full bg-lavender px-2.5 py-1 text-xs font-bold text-lavender-deep dark:bg-accent/20 dark:text-lavender">
+          {state.phraseIndex + 1} / {PHRASES.length}
         </span>
       </header>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
-        {/* Camera + controls (left on desktop) */}
-        <div className="flex flex-col gap-3 md:min-w-0 md:flex-1">
-          <div className="relative aspect-[3/4] max-h-[44vh] w-full overflow-hidden rounded-3xl bg-camera shadow-xl shadow-black/20 md:max-h-none">
+      <div className="flex flex-col gap-4">
+        {/* Camera + controls */}
+        <div className="flex flex-col">
+          <div className="relative aspect-[3/4] max-h-[44vh] w-full overflow-hidden rounded-3xl bg-camera shadow-xl shadow-black/20">
             <video
               ref={videoRef}
               autoPlay
@@ -150,57 +146,32 @@ export default function Practice({ onNavigate }) {
               </div>
             )}
             {cameraOn && (
-              <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-                {recording ? "Reading your lips…" : "Camera on ✓"}
-              </div>
+              <CameraChip>
+                {recording ? "Reading your lips… release to stop" : processing ? "Thinking…" : "Hold the button and mouth the phrase"}
+              </CameraChip>
             )}
           </div>
 
-          {/* Record controls */}
-          <div className="flex items-center justify-center gap-[24px] py-2">
-            <button
-              title="Type instead"
-              aria-label="Type instead"
-              onClick={() => setTyping((t) => !t)}
-              className="grid size-[56px] place-items-center rounded-full border border-line text-muted transition hover:text-body dark:border-line-dark dark:hover:text-white"
-            >
+          <div className="flex items-center justify-center gap-6 py-5">
+            <SideButton label="Type instead" onClick={() => setTyping((t) => !t)}>
               <Icon d={paths.keyboard} />
-            </button>
-            <button
-              title={recording ? "Stop" : cameraOn ? "Start practicing" : "Start camera"}
-              aria-label={recording ? "Stop" : cameraOn ? "Start practicing" : "Start camera"}
-              aria-pressed={recording}
-              onClick={toggleRecord}
-              disabled={processing}
-              className={`grid size-[72px] place-items-center rounded-full text-white ring-4 transition disabled:opacity-50 ${
-                recording
-                  ? "bg-red-500 shadow-xl shadow-red-500/40 ring-red-500/20 hover:bg-red-600"
-                  : "bg-accent shadow-accent ring-accent/20 hover:bg-accent-strong"
-              }`}
-            >
-              {recording ? (
-                <span className="size-6 rounded-md bg-white" />
-              ) : (
-                <Icon d={cameraOn ? paths.mic : paths.camera} className="size-7" />
-              )}
-            </button>
-            <button
-              title="Replay your attempt"
-              aria-label="Replay your attempt"
+            </SideButton>
+            <HoldButton holding={recording} cameraOn={cameraOn} disabled={processing} hold={hold} />
+            <SideButton
+              label="Replay your attempt"
               disabled={!result}
               onClick={() => {
                 unlockSound();
                 play({ text: result.recognized, audio: null });
               }}
-              className="grid size-[56px] place-items-center rounded-full border border-line text-muted transition hover:text-body disabled:opacity-40 dark:border-line-dark dark:hover:text-white"
             >
               <Icon d={paths.speaker} />
-            </button>
+            </SideButton>
           </div>
         </div>
 
-        {/* Phrase + result (right on desktop) */}
-        <div className="order-first flex flex-col gap-4 md:order-none md:w-[420px] md:shrink-0">
+        {/* Phrase + result (above the camera) */}
+        <div className="order-first flex flex-col gap-4">
           {/* Target phrase: visible in every state */}
           <div className="rounded-3xl border border-line bg-card p-5 shadow-sm shadow-black/5 dark:border-line-dark dark:bg-panel">
             <div className="mb-1 flex items-center justify-between gap-2">

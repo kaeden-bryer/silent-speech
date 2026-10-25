@@ -267,7 +267,7 @@ def start_call(number: str = Body(embed=True)):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=503)
     call_active = True
-    return {"ok": True}
+    return {"ok": True, "listen": phone.listen_key()}  # the key to hear them live: /api/call/audio?key=
 
 
 @app.post("/api/hangup")
