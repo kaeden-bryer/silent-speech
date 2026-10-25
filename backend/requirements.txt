@@ -10,3 +10,4 @@ scikit-image
 kokoro
 soundfile
 rapidfuzz
+transformers  # llm_correction.py (kokoro installs it already)
