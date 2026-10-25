@@ -222,6 +222,16 @@ export default function Practice({ onNavigate }) {
               </button>
             </div>
             <p className="text-[1.5rem] font-extrabold leading-snug tracking-tight">{target}</p>
+            {!result && (
+              <div className="mt-1 flex justify-end">
+                <button
+                  onClick={() => dispatch({ type: "NEXT" })}
+                  className="rounded-full px-2 py-1 text-sm font-semibold text-muted transition hover:text-accent"
+                >
+                  Skip →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Result card */}
