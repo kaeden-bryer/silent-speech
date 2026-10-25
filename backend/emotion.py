@@ -4,9 +4,9 @@ Input:  video_path  the same clip the lip reader gets, uncropped (None if the us
         text        the lip reader's raw text (unused for now)
 Output: "neutral", "energetic", "sad" or "angry"
 
-How: a rough guess from the face, a few frames per clip. OpenCV's built-in face detector
-finds the face, and mini-XCEPTION (FER2013, 58k parameters, emotion.onnx, 236 KB) scores
-64x64 grayscale crops on the CPU with cv2.dnn. No GPU, no extra packages, no download.
+How: a rough guess from the face, a few frames per clip. MediaPipe's face detector (the same
+model file the lip reader uses) finds the face, and mini-XCEPTION (FER2013, 58k parameters,
+emotion.onnx, 236 KB) scores 64x64 grayscale crops on the CPU with cv2.dnn. No GPU.
 Its 7 emotions are folded into our 4, see GROUPS.
 Frames are looked at middle first (1/2, then 1/4 and 3/4, then the 1/8ths...), each one
 votes, and it stops as soon as one emotion has CONFIRM votes.
@@ -19,9 +19,12 @@ import time
 from pathlib import Path
 
 import cv2
+import mediapipe as mp
 import numpy as np
+from mediapipe.tasks.python import BaseOptions, vision
 
 MODEL = Path(__file__).with_name("emotion.onnx")  # from fer2013_mini_XCEPTION.102-0.66.hdf5
+FACE_MODEL = Path(__file__).parent.parent / "models" / "blaze_face_short_range.tflite"  # see models/MANIFEST.md
 FER2013 = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]  # model output order
 GROUPS = {  # neutral first: it wins ties, and is the answer when no face was found
     "neutral": ["neutral"],
@@ -32,15 +35,17 @@ GROUPS = {  # neutral first: it wins ties, and is the answer when no face was fo
 CONFIRM = 3  # stop once this many frames agree
 MAX_LOOKS = 9  # never look at more frames than this, even if they keep disagreeing
 EVERY = 6  # only every 6th frame is a candidate (5 per second at 30 fps)
-DETECT_WIDTH = 240  # frames are shrunk to this before looking for the face: faster
 
 net = cv2.dnn.readNetFromONNX(str(MODEL))
-faces = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-lock = threading.Lock()  # cv2.dnn is not thread-safe
+# Not OpenCV's Haar cascade: OpenCV 5 (which mediapipe installs) no longer ships its files.
+detector = vision.FaceDetector.create_from_options(
+    vision.FaceDetectorOptions(base_options=BaseOptions(model_asset_path=str(FACE_MODEL)))
+)
+lock = threading.Lock()  # neither cv2.dnn nor the face detector is thread-safe
 
 
 def sample_frames(video_path):
-    """Every EVERY-th frame, grayscale, DETECT_WIDTH wide.
+    """Every EVERY-th frame, RGB.
     Chrome's .webm has no index (no seeking, no frame count), so the whole clip is decoded;
     only the candidates are converted, which is cheap. Looking at them is the slow part."""
     cap = cv2.VideoCapture(video_path)
@@ -50,9 +55,7 @@ def sample_frames(video_path):
             break
         if i % EVERY:
             continue
-        frame = cap.retrieve()[1]
-        scale = DETECT_WIDTH / frame.shape[1]
-        frames.append(cv2.cvtColor(cv2.resize(frame, None, fx=scale, fy=scale), cv2.COLOR_BGR2GRAY))
+        frames.append(cv2.cvtColor(cap.retrieve()[1], cv2.COLOR_BGR2RGB))
     cap.release()
     return frames
 
@@ -71,13 +74,22 @@ def middle_first(n):
     return order
 
 
-def find_face(gray):
-    """The biggest face as a 64x64 crop, or None."""
-    found = faces.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30))
-    if len(found) == 0:
+def find_face(rgb):
+    """The biggest face as a 64x64 grayscale crop, or None."""
+    with lock:
+        found = detector.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)).detections
+    if not found:
         return None
-    x, y, w, h = max(found, key=lambda f: f[2] * f[3])
-    return cv2.resize(gray[y:y + h, x:x + w], (64, 64))
+    box = max(found, key=lambda f: f.bounding_box.width * f.bounding_box.height).bounding_box
+    # Framed like the Haar detector this was tuned with (measured on our clips):
+    # 15% bigger, and a sixth of its width higher, so it shows more forehead
+    size = 1.15 * box.width
+    cx, cy = box.origin_x + box.width / 2, box.origin_y + box.height / 2 - box.width / 6
+    x, y = int(max(cx - size / 2, 0)), int(max(cy - size / 2, 0))  # the box can stick out of the frame
+    face = rgb[y:int(cy + size / 2), x:int(cx + size / 2)]
+    if face.size == 0:
+        return None
+    return cv2.resize(cv2.cvtColor(face, cv2.COLOR_RGB2GRAY), (64, 64), interpolation=cv2.INTER_AREA)
 
 
 def guess(face):
@@ -112,7 +124,7 @@ def detect_emotion(video_path: str | None, text: str) -> str:
     return max(GROUPS, key=seen.count)  # the most votes; no votes or a tie: neutral
 
 
-find_face(np.zeros((180, DETECT_WIDTH), np.uint8))  # warm-up: the first run of each is slow
+find_face(np.zeros((480, 640, 3), np.uint8))  # warm-up: the first run of each is slow
 guess(np.zeros((64, 64), np.uint8))
 
 

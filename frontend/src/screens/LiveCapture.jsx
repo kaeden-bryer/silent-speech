@@ -59,7 +59,8 @@ export default function LiveCapture({ onNavigate }) {
     if (!cameraOn) return void startCamera();
     if (recording) return void recorderRef.current?.stop();
     const chunks = [];
-    const rec = new MediaRecorder(streamRef.current);
+    // iPhones record at 4-9 Mbps by default: 2.5 (Chrome's default) makes the upload 2-4x smaller
+    const rec = new MediaRecorder(streamRef.current, { videoBitsPerSecond: 2_500_000 });
     rec.ondataavailable = (e) => chunks.push(e.data);
     rec.onstop = () => {
       setRecording(false);

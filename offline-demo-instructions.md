@@ -23,7 +23,7 @@ cd ~/Github/silent-speech
 
 ### 2. Start the Ascent's Wi-Fi network
 ```bash
-scripts/setup_network.sh hotspot
+sudo scripts/setup_network.sh hotspot
 ```
 It prints the network name and password (by default `SilentSpeech` / `silentspeech`).
 
@@ -59,7 +59,7 @@ You never have to do Part 1, step 5 again, unless you delete the profile from th
 ### 1. Make sure the hotspot is on
 ```bash
 cd ~/Github/silent-speech
-scripts/setup_network.sh hotspot
+sudo scripts/setup_network.sh hotspot
 ```
 Then check the iPhone is joined to **SilentSpeech**.
 
@@ -99,7 +99,7 @@ Phrases from `backend/demo_phrases.txt` work most reliably.
 - Press **Ctrl+C** in the terminal running `python server.py`.
 - Turn off the hotspot:
   ```bash
-  scripts/setup_network.sh hotspot-down
+  sudo scripts/setup_network.sh hotspot-down
   ```
 
 ---

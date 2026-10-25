@@ -11,9 +11,11 @@ Setup: models/MANIFEST.md.  Try a clip on its own:  python lipreading.py clip.we
 """
 
 import os
+import queue
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 # torch 2.14 compiles some ops with Triton on first use, which needs python3-dev headers.
@@ -40,10 +42,14 @@ FPS = 25  # the model was trained on 25 fps video
 BEAM_SIZE = 10  # the repo uses 40: slightly better, slower
 MIN_FRAMES = 10  # shorter than ~0.4 s: nothing was said
 MAX_MISSING = 0.3  # give up if the face is missing in more frames than this
+FACE_THREADS = 8  # frames searched for the face at once: ~8x faster than one by one, same result
 
-detector = vision.FaceDetector.create_from_options(
-    vision.FaceDetectorOptions(base_options=BaseOptions(model_asset_path=str(FACE_MODEL)))
-)
+detectors = queue.SimpleQueue()  # one detector per thread: a detector can't be used by two at once
+for _ in range(FACE_THREADS):
+    detectors.put(vision.FaceDetector.create_from_options(
+        vision.FaceDetectorOptions(base_options=BaseOptions(model_asset_path=str(FACE_MODEL)))
+    ))
+face_pool = ThreadPoolExecutor(FACE_THREADS)
 video_process = VideoProcess(convert_gray=False)
 video_transform = VideoTransform(subset="test")
 text_transform = TextTransform()
@@ -88,7 +94,11 @@ def read_frames(video_path):
 
 def find_face(frame):
     """Right eye, left eye, nose tip, mouth centre in pixels (the 4 points the repo uses), or None."""
-    faces = detector.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)).detections
+    detector = detectors.get()
+    try:
+        faces = detector.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)).detections
+    finally:
+        detectors.put(detector)
     if not faces:
         return None
     face = max(faces, key=lambda f: f.bounding_box.width * f.bounding_box.height)
@@ -110,7 +120,7 @@ def lip_read(video_path: str) -> str:
     frames = read_frames(video_path)
     if len(frames) < MIN_FRAMES:
         return ""
-    landmarks = [find_face(f) for f in frames]
+    landmarks = list(face_pool.map(find_face, frames))
     missing = sum(lm is None for lm in landmarks) / len(landmarks)
     if missing > MAX_MISSING:
         raise ValueError(f"face not found in {missing:.0%} of frames")

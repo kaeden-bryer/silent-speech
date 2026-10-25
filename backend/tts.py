@@ -1,7 +1,7 @@
 """Track 3: text to speech.
 
 Input:  text     what to say
-        emotion  "neutral", "happy", "sad", "angry" or "surprised"
+        emotion  "neutral", "energetic", "sad" or "angry" (what emotion.py returns), or "happy", "surprised"
 Output: MP3 audio as bytes, or None to let the browser read the text with its own voice.
 
 How: Kokoro-82M, running locally on the GPU (no internet needed once the weights are cached).
@@ -19,7 +19,7 @@ from kokoro import KPipeline
 
 VOICE = "af_heart"
 SAMPLE_RATE = 24000
-SPEED = {"happy": 1.1, "surprised": 1.1, "sad": 0.9}  # a small hint of emotion
+SPEED = {"happy": 1.1, "surprised": 1.1, "energetic": 1.1, "sad": 0.9}  # a small hint of emotion
 
 pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M", device="cuda")
 gpu = threading.Lock()

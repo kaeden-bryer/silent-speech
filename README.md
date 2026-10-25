@@ -31,6 +31,8 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 - Open http://localhost:8000.
+- After pulling, rebuild the website: `cd frontend && npm install && npm run build`. `frontend/dist` is not in git, so a pull alone doesn't change what the phone sees.
+- Every sentence prints one line in the terminal with how long each step took (`ms: lip 459, emotion 85, llm 553, snap 0, tts 50`).
 - Typing a sentence works as if the lip reader had read it, so you can test your part without the camera.
 - API keys go in `backend/.env` (never commit it). Read them with `os.getenv("NAME")`.
 - Packages you need go in `backend/requirements.txt`.
